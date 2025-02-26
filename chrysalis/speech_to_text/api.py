@@ -1,7 +1,11 @@
+import time
+import logging
 from typing import Optional, Tuple
 import numpy as np
 from .base import SpeechToTextBase
 from .whisper_api import WhisperAPI
+
+logger = logging.getLogger('chrysalis.stt')
 
 class SpeechToTextAPI:
     def __init__(self, implementation: str = "whisper_api"):
@@ -12,8 +16,11 @@ class SpeechToTextAPI:
         
         if implementation not in self.implementation_map:
             raise ValueError(f"Unknown implementation: {implementation}")
-            
+        
+        logger.info("Initializing STT with implementation: %s", implementation)
+        start = time.time()
         self.implementation = self.implementation_map[implementation]()
+        logger.debug("STT implementation initialized in %.2fs", time.time() - start)
     
     def transcribe(self, 
                   audio_file: Optional[str] = None,
@@ -30,12 +37,23 @@ class SpeechToTextAPI:
         Returns:
             Transcribed text
         """
+        start = time.time()
+        
         if use_mic:
+            logger.info("Recording from microphone")
+            mic_start = time.time()
             audio_data = self.implementation.record_audio()
+            logger.debug("Recording completed in %.2fs", time.time() - mic_start)
             
         if audio_data is not None:
-            return self.implementation.transcribe_audio(audio_data[0], audio_data[1])
+            logger.info("Transcribing audio data")
+            result = self.implementation.transcribe_audio(audio_data[0], audio_data[1])
         elif audio_file is not None:
-            return self.implementation.transcribe_file(audio_file)
+            logger.info("Transcribing audio file: %s", audio_file)
+            result = self.implementation.transcribe_file(audio_file)
         else:
-            raise ValueError("Must provide audio_file, audio_data or use_mic=True") 
+            raise ValueError("Must provide audio_file, audio_data or use_mic=True")
+        
+        duration = time.time() - start
+        logger.info("Transcription completed in %.2fs: %s", duration, result)
+        return result 

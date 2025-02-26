@@ -1,5 +1,8 @@
 import click
 from .pipeline import VoiceAssistantPipeline, PipelineConfig
+from .logging import setup_logging
+
+logger = setup_logging()
 
 @click.group()
 def cli():
