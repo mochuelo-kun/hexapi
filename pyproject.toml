@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "chrysalis"
+version = "0.1.0"
+description = "A framework for embodied AI interaction through voice"
+authors = ["Your Name <your.email@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+python-dotenv = "^1.0.0"
+openai = "^1.0.0"
+sounddevice = "^0.4.6"
+soundfile = "^0.12.1"
+numpy = "^1.24.0"
+requests = "^2.31.0"
+click = "^8.1.7"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-cov = "^4.1.0"
+black = "^23.7.0"
+isort = "^5.12.0"
+
+[tool.poetry.scripts]
+chrysalis = "chrysalis.cli:cli"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
