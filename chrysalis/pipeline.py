@@ -13,6 +13,7 @@ logger = logging.getLogger('chrysalis.pipeline')
 class ChrysalisConfig:
     """Configuration for the Chrysalis pipeline"""
     stt_implementation: str = "whisper_api"
+    stt_model: Optional[str] = None  # For whisper_local
     llm_model: str = "ollama:llama2"
     tts_implementation: str = "elevenlabs"
     voice_id: Optional[str] = None
@@ -25,7 +26,10 @@ class ChrysalisPipeline:
         
         # Initialize components
         start = time.time()
-        self.stt = SpeechToTextAPI(implementation=self.config.stt_implementation)
+        self.stt = SpeechToTextAPI(
+            implementation=self.config.stt_implementation,
+            model_name=self.config.stt_model
+        )
         self.llm = LLMQueryAPI()
         self.tts = TextToSpeechAPI(implementation=self.config.tts_implementation)
         logger.debug("Pipeline components initialized in %.2fs", time.time() - start)

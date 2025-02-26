@@ -7,6 +7,9 @@ class Config:
     # OpenAI
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     
+    # Whisper Local
+    WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
+    
     # ElevenLabs
     ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
     

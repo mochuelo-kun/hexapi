@@ -4,13 +4,15 @@ from typing import Optional, Tuple
 import numpy as np
 from .base import SpeechToTextBase
 from .whisper_api import WhisperAPI
+from .whisper_local import WhisperLocal
 
 logger = logging.getLogger('chrysalis.stt')
 
 class SpeechToTextAPI:
-    def __init__(self, implementation: str = "whisper_api"):
+    def __init__(self, implementation: str = "whisper_api", **kwargs):
         self.implementation_map = {
             "whisper_api": WhisperAPI,
+            "whisper_local": WhisperLocal,
             # Add other implementations here
         }
         
@@ -19,7 +21,7 @@ class SpeechToTextAPI:
         
         logger.info("Initializing STT with implementation: %s", implementation)
         start = time.time()
-        self.implementation = self.implementation_map[implementation]()
+        self.implementation = self.implementation_map[implementation](**kwargs)
         logger.debug("STT implementation initialized in %.2fs", time.time() - start)
     
     def transcribe(self, 
