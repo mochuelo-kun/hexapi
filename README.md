@@ -48,6 +48,17 @@ Chrysalis takes inspiration from how humans naturally converse and interact, ack
 
 4. Edit .env with your API keys
 
+5. Download Piper voice models (optional)
+```bash
+# Create models directory
+mkdir -p ~/.piper-tts
+cd ~/.piper-tts
+
+# Download a model (e.g., English US Amy)
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx
+wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.json
+```
+
 ## Usage
 
 Basic usage through CLI:

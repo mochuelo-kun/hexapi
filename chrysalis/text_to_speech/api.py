@@ -1,11 +1,16 @@
 from typing import Optional
 from .base import TextToSpeechBase
 from .elevenlabs import ElevenLabsTTS
+from .piper_local import PiperLocalTTS
+import logging
+
+logger = logging.getLogger('chrysalis.tts')
 
 class TextToSpeechAPI:
-    def __init__(self, implementation: str = "elevenlabs"):
+    def __init__(self, implementation: str = "elevenlabs", **kwargs):
         self.implementation_map = {
             "elevenlabs": ElevenLabsTTS,
+            "piper": PiperLocalTTS,
             # Add other implementations here
         }
         

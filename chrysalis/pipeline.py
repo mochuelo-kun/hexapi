@@ -17,6 +17,8 @@ class ChrysalisConfig:
     llm_model: str = "ollama:llama2"
     tts_implementation: str = "elevenlabs"
     voice_id: Optional[str] = None
+    tts_model_dir: Optional[str] = None   # For piper
+    tts_model_name: Optional[str] = None  # For piper
 
 class ChrysalisPipeline:
     def __init__(self, config: Optional[ChrysalisConfig] = None):
@@ -31,7 +33,11 @@ class ChrysalisPipeline:
             model_name=self.config.stt_model
         )
         self.llm = LLMQueryAPI()
-        self.tts = TextToSpeechAPI(implementation=self.config.tts_implementation)
+        self.tts = TextToSpeechAPI(
+            implementation=self.config.tts_implementation,
+            model_path=self.config.tts_model_path,
+            config_path=self.config.tts_config_path
+        )
         logger.debug("Pipeline components initialized in %.2fs", time.time() - start)
     
     def run(self,
