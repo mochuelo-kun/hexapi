@@ -59,6 +59,11 @@ wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/mediu
 wget https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.json
 ```
 
+Note: MacOS users may have issues installing piper
+
+TODO: figure out MacOS + piper problem (or remove until python piper fixes the problem?)
+
+
 ## Usage
 
 Basic usage through CLI:

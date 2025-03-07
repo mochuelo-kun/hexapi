@@ -7,7 +7,10 @@ import logging
 logger = logging.getLogger('chrysalis.tts')
 
 class TextToSpeechAPI:
-    def __init__(self, implementation: str = "elevenlabs", **kwargs):
+    def __init__(self,
+                 implementation: str,
+                 tts_model: str,
+                 **kwargs):
         self.implementation_map = {
             "elevenlabs": ElevenLabsTTS,
             "piper": PiperLocalTTS,
@@ -16,13 +19,12 @@ class TextToSpeechAPI:
         
         if implementation not in self.implementation_map:
             raise ValueError(f"Unknown implementation: {implementation}")
-            
+        self.tts_model = tts_model
         self.implementation = self.implementation_map[implementation]()
     
     def synthesize(self, 
                   text: str,
                   output_file: str,
-                  voice_id: Optional[str] = None,
                   **kwargs) -> None:
         """
         Synthesize text to speech
@@ -30,10 +32,7 @@ class TextToSpeechAPI:
         Args:
             text: Input text
             output_file: Path to save audio file
-            voice_id: Voice identifier (implementation specific)
             **kwargs: Additional implementation-specific parameters
         """
-        if voice_id and hasattr(self.implementation, 'voice_id'):
-            self.implementation.voice_id = voice_id
             
         self.implementation.synthesize(text, output_file, **kwargs) 

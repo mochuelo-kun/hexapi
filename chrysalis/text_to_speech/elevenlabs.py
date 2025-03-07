@@ -3,12 +3,12 @@ from .base import TextToSpeechBase
 from ..config import Config
 
 class ElevenLabsTTS(TextToSpeechBase):
-    def __init__(self, voice_id: str = "21m00Tcm4TlvDq8ikWAM"):
+    def __init__(self, tts_model: str = "21m00Tcm4TlvDq8ikWAM"):
         self.api_key = Config.ELEVENLABS_API_KEY
-        self.voice_id = voice_id
+        self.tts_model = tts_model
         
     def synthesize(self, text: str, output_file: str, **kwargs) -> None:
-        url = f"https://api.elevenlabs.io/v1/text-to-speech/{self.voice_id}"
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{self.tts_model}"
         
         headers = {
             "Accept": "audio/mpeg",

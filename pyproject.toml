@@ -5,26 +5,30 @@ description = "A framework for embodied AI interaction through voice"
 authors = ["Your Name <your.email@example.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
-python-dotenv = "^1.0.0"
-openai = "^1.0.0"
-sounddevice = "^0.4.6"
-soundfile = "^0.12.1"
-numpy = "^1.24.0"
-requests = "^2.31.0"
-click = "^8.1.7"
+python = "^3.12"
+python-dotenv = "^1.0.1"
+openai = "^1.64.0"
+sounddevice = "^0.5.1"
+soundfile = "^0.13.1"
+numpy = "^2.2.3"
+requests = "^2.32.3"
+click = "^8.1.8"
 whisper = "^1.1.10"
-torch = "^2.2.0"
-piper-tts = "^1.2.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.4.0"
-pytest-cov = "^4.1.0"
-black = "^23.7.0"
-isort = "^5.12.0"
+torch = "^2.6.0"
+# temporarily removing piper stuff until macos install is sorted out
+# piper-phonemize = "^1.1.0"
+# piper-tts = "^1.2.0"
 
 [tool.poetry.scripts]
 chrysalis = "chrysalis.cli:cli"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+pytest-cov = "^6.0.0"
+black = "^25.1.0"
+isort = "^6.0.1"
+# MacOS users uncomment the line below before poetry install
+# piper-phonemize = {file="./lib/piper_phonemize-1.1.0-cp312-cp312-macosx_10_14_universal2.whl"}
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

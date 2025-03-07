@@ -16,9 +16,7 @@ class ChrysalisConfig:
     stt_model: Optional[str] = None  # For whisper_local
     llm_model: str = "ollama:llama2"
     tts_implementation: str = "elevenlabs"
-    voice_id: Optional[str] = None
-    tts_model_dir: Optional[str] = None   # For piper
-    tts_model_name: Optional[str] = None  # For piper
+    tts_model: Optional[str] = None
 
 class ChrysalisPipeline:
     def __init__(self, config: Optional[ChrysalisConfig] = None):
@@ -35,8 +33,7 @@ class ChrysalisPipeline:
         self.llm = LLMQueryAPI()
         self.tts = TextToSpeechAPI(
             implementation=self.config.tts_implementation,
-            model_path=self.config.tts_model_path,
-            config_path=self.config.tts_config_path
+            tts_model=self.config.tts_model,
         )
         logger.debug("Pipeline components initialized in %.2fs", time.time() - start)
     
@@ -81,7 +78,7 @@ class ChrysalisPipeline:
         self.tts.synthesize(
             text=llm_response,
             output_file=output_file,
-            voice_id=self.config.voice_id
+            tts_model=self.config.tts_model
         )
         tts_time = time.time() - tts_start
         logger.info("Text-to-speech completed in %.2fs", tts_time)
@@ -119,5 +116,5 @@ class ChrysalisPipeline:
         self.tts.synthesize(
             text=text,
             output_file=output_file,
-            voice_id=self.config.voice_id
+            tts_model=self.config.tts_model
         ) 

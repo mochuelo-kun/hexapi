@@ -5,6 +5,7 @@ import numpy as np
 import soundfile as sf
 from piper import PiperVoice
 from .base import TextToSpeechBase
+from ..config import Config
 
 logger = logging.getLogger('chrysalis.tts.piper_local')
 
@@ -15,22 +16,22 @@ logger = logging.getLogger('chrysalis.tts.piper_local')
 # Full list at: https://huggingface.co/rhasspy/piper-voices
 # Voice samples available at: https://rhasspy.github.io/piper-samples/
 
+DEFAULT_SAMPLE_RATE = 22050
+
 class PiperLocalTTS(TextToSpeechBase):
     def __init__(self, 
-                 onnx_model_dir: str,
-                 onnx_model_name: str,
-                 sample_rate: int = 22050):
+                 tts_model: str,
+                 sample_rate: int = DEFAULT_SAMPLE_RATE):
         """
         Initialize Piper TTS
         
         Args:
-            onnx_model_dir: Directory containing the .onnx and .json files
-            onnx_model_name: Name of model (e.g. 'en_US-amy-medium')
+            tts_model: Name of voice model (e.g. 'en_US-amy-medium')
             sample_rate: Output audio sample rate
         """
-        model_dir = Path(onnx_model_dir)
-        model_path = model_dir / f"{onnx_model_name}.onnx"
-        config_path = model_dir / f"{onnx_model_name}.json"
+        model_dir = Path(Config.PIPER_MODEL_DIR)
+        model_path = model_dir / f"{tts_model}.onnx"
+        config_path = model_dir / f"{tts_model}.json"
         
         if not model_path.exists() or not config_path.exists():
             raise FileNotFoundError(
@@ -38,12 +39,12 @@ class PiperLocalTTS(TextToSpeechBase):
                 f"Expected {model_path.name} and {config_path.name}"
             )
         
-        logger.info("Loading Piper model: %s from %s", onnx_model_name, model_dir)
+        logger.info("Loading Piper model: %s from %s", tts_model, model_dir)
         load_start = time.time()
         self.voice = PiperVoice.load(str(model_path), str(config_path))
         logger.info("Piper model loaded in %.2fs", time.time() - load_start)
         
-        self.model_name = onnx_model_name
+        self.model_name = tts_model
         self.sample_rate = sample_rate
     
     def synthesize(self, text: str, output_file: str, **kwargs) -> None:
@@ -58,7 +59,7 @@ class PiperLocalTTS(TextToSpeechBase):
         logger.debug("Synthesizing text with %s: %s", 
                     self.model_name, 
                     text[:50] + "..." if len(text) > 50 else text)
-        start = time.time()
+        start_time = time.time()
         
         # Generate audio
         audio_data = self.voice.synthesize(text)
@@ -66,9 +67,9 @@ class PiperLocalTTS(TextToSpeechBase):
         # Save to file
         sf.write(output_file, audio_data, self.sample_rate)
         
-        duration = time.time() - start
+        duration = time.time() - start_time
         audio_duration = len(audio_data) / self.sample_rate
         logger.info(
             "Synthesis completed in %.2fs (audio length: %.2fs, %.1fx realtime)", 
             duration, audio_duration, audio_duration/duration
-        ) 
+        )
