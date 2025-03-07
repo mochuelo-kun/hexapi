@@ -3,7 +3,6 @@ import logging
 from pathlib import Path
 import numpy as np
 import soundfile as sf
-from piper import PiperVoice
 from .base import TextToSpeechBase
 from ..config import Config
 
@@ -40,9 +39,19 @@ class PiperLocalTTS(TextToSpeechBase):
             )
         
         logger.info("Loading Piper model: %s from %s", tts_model, model_dir)
-        load_start = time.time()
-        self.voice = PiperVoice.load(str(model_path), str(config_path))
-        logger.info("Piper model loaded in %.2fs", time.time() - load_start)
+        try:
+            from piper import PiperVoice
+            
+            load_start = time.time()
+            self.voice = PiperVoice.load(str(model_path), str(config_path))
+            logger.info("Piper model loaded in %.2fs", time.time() - load_start)
+            
+        except ImportError as e:
+            logger.error("Failed to import Piper dependencies: %s", e)
+            raise ImportError(
+                "Missing required dependency: piper-tts. "
+                "Please check the README for installation instructions."
+            )
         
         self.model_name = tts_model
         self.sample_rate = sample_rate

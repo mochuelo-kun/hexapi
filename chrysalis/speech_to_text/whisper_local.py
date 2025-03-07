@@ -1,8 +1,6 @@
 import time
 import logging
-import whisper
 import numpy as np
-from typing import Optional
 from .base import SpeechToTextBase
 
 logger = logging.getLogger('chrysalis.stt.whisper_local')
@@ -15,12 +13,20 @@ class WhisperLocal(SpeechToTextBase):
         Args:
             model_name: Whisper model size ("tiny", "base", "small", "medium", "large")
         """
-        logger.info("Loading Whisper model: %s", model_name)
-        load_start = time.time()
-        self.model = whisper.load_model(model_name)
-        logger.info("Whisper model loaded in %.2fs", time.time() - load_start)
-        
         self.model_name = model_name
+        
+        logger.info("Loading Whisper model: %s", model_name)
+        try:
+            import whisper
+            load_start = time.time()
+            self.model = whisper.load_model(model_name)
+            logger.info("Whisper model loaded in %.2fs", time.time() - load_start)
+        except ImportError as e:
+            logger.error("Failed to import Whisper dependencies: %s", e)
+            raise ImportError(
+                "Missing required dependency: whisper. "
+                "Please check the README for installation instructions."
+            )
     
     def transcribe_file(self, audio_file: str) -> str:
         """Transcribe audio from a file"""
