@@ -1,0 +1,335 @@
+.onnx_data
+├── diarization
+│   ├── recognition
+│   │   ├── 3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx
+│   │   ├── 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx
+│   │   ├── 3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx
+│   │   ├── nemo_en_speakerverification_speakernet.onnx
+│   │   ├── nemo_en_titanet_large.onnx
+│   │   ├── nemo_en_titanet_small.onnx
+│   │   ├── wespeaker_en_voxceleb_CAM++.onnx
+│   │   ├── wespeaker_en_voxceleb_CAM++_LM.onnx
+│   │   ├── wespeaker_en_voxceleb_resnet293_LM.onnx
+│   │   └── wespeaker_en_voxceleb_resnet34_LM.onnx
+│   └── segmentation
+│       ├── sherpa-onnx-pyannote-segmentation-3-0
+│       │   ├── LICENSE
+│       │   ├── README.md
+│       │   ├── export-onnx.py
+│       │   ├── model.int8.onnx
+│       │   ├── model.onnx
+│       │   ├── run.sh
+│       │   ├── show-onnx.py
+│       │   ├── speaker-diarization-onnx.py
+│       │   ├── speaker-diarization-torch.py
+│       │   ├── vad-onnx.py
+│       │   └── vad-torch.py
+│       ├── sherpa-onnx-reverb-diarization-v1
+│       │   ├── LICENSE
+│       │   ├── README.md
+│       │   ├── export-onnx.py
+│       │   ├── model.int8.onnx
+│       │   ├── model.onnx
+│       │   ├── run.sh
+│       │   ├── show-onnx.py
+│       │   ├── speaker-diarization-onnx.py
+│       │   ├── speaker-diarization-torch.py
+│       │   ├── vad-onnx.py
+│       │   └── vad-torch.py
+│       └── sherpa-onnx-reverb-diarization-v2
+│           ├── LICENSE
+│           ├── README.md
+│           ├── export-onnx.py
+│           ├── model.int8.onnx
+│           ├── model.onnx
+│           ├── run.sh
+│           ├── show-onnx.py
+│           ├── speaker-diarization-onnx.py
+│           ├── speaker-diarization-torch.py
+│           ├── sym_shape_infer_temp.onnx
+│           ├── vad-onnx.py
+│           └── vad-torch.py
+├── stt
+│   ├── sherpa-onnx-conformer-en-2023-03-18
+│   │   ├── README.md
+│   │   ├── decoder-epoch-99-avg-1.int8.onnx
+│   │   ├── decoder-epoch-99-avg-1.onnx
+│   │   ├── encoder-epoch-99-avg-1.int8.onnx
+│   │   ├── encoder-epoch-99-avg-1.onnx
+│   │   ├── export-onnx-stateless3.sh
+│   │   ├── joiner-epoch-99-avg-1.int8.onnx
+│   │   ├── joiner-epoch-99-avg-1.onnx
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   └── tokens.txt
+│   ├── sherpa-onnx-lstm-en-2023-02-17
+│   │   ├── README.md
+│   │   ├── decoder-epoch-99-avg-1.int8.onnx
+│   │   ├── decoder-epoch-99-avg-1.onnx
+│   │   ├── encoder-epoch-99-avg-1.int8.onnx
+│   │   ├── encoder-epoch-99-avg-1.onnx
+│   │   ├── export-onnx-lstm2.sh
+│   │   ├── joiner-epoch-99-avg-1.int8.onnx
+│   │   ├── joiner-epoch-99-avg-1.onnx
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   └── tokens.txt
+│   ├── sherpa-onnx-moonshine-base-en-int8
+│   │   ├── LICENSE
+│   │   ├── README.md
+│   │   ├── cached_decode.int8.onnx
+│   │   ├── encode.int8.onnx
+│   │   ├── preprocess.onnx
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   ├── tokens.txt
+│   │   └── uncached_decode.int8.onnx
+│   ├── sherpa-onnx-moonshine-tiny-en-int8
+│   │   ├── LICENSE
+│   │   ├── README.md
+│   │   ├── cached_decode.int8.onnx
+│   │   ├── encode.int8.onnx
+│   │   ├── preprocess.onnx
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   ├── tokens.txt
+│   │   └── uncached_decode.int8.onnx
+│   ├── sherpa-onnx-nemo-ctc-en-conformer-large
+│   │   ├── README.md
+│   │   ├── add-model-metadata.py
+│   │   ├── model.int8.onnx
+│   │   ├── model.onnx
+│   │   ├── quantize-model.py
+│   │   ├── test.py
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   └── tokens.txt
+│   ├── sherpa-onnx-nemo-ctc-en-conformer-medium
+│   │   ├── 0.wav
+│   │   ├── 1.wav
+│   │   ├── 8k.wav
+│   │   ├── README.md
+│   │   ├── add-model-metadata.py
+│   │   ├── model.int8.onnx
+│   │   ├── model.onnx
+│   │   ├── quantize-model.py
+│   │   ├── test.py
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   ├── tokens.txt
+│   │   └── trans.txt
+│   ├── sherpa-onnx-nemo-ctc-en-conformer-small
+│   │   ├── README.md
+│   │   ├── add-model-metadata.py
+│   │   ├── model.int8.onnx
+│   │   ├── model.onnx
+│   │   ├── quantize-model.py
+│   │   ├── test.py
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   └── tokens.txt
+│   ├── sherpa-onnx-nemo-fast-conformer-transducer-en-24500
+│   │   ├── decoder.onnx
+│   │   ├── encoder.onnx
+│   │   ├── joiner.onnx
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   └── en-english.wav
+│   │   └── tokens.txt
+│   ├── sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000
+│   │   ├── model.onnx
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   └── 1.wav
+│   │   └── tokens.txt
+│   ├── sherpa-onnx-paraformer-en-2024-03-09
+│   │   ├── README.md
+│   │   ├── add-model-metadata.py
+│   │   ├── am.mvn
+│   │   ├── config.yaml
+│   │   ├── convert-tokens.py
+│   │   ├── model.int8.onnx
+│   │   ├── model.onnx
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   └── tokens.txt
+│   ├── sherpa-onnx-streaming-zipformer-en-2023-06-21
+│   │   ├── README.md
+│   │   ├── decoder-epoch-99-avg-1.int8.onnx
+│   │   ├── decoder-epoch-99-avg-1.onnx
+│   │   ├── encoder-epoch-99-avg-1.int8.onnx
+│   │   ├── encoder-epoch-99-avg-1.onnx
+│   │   ├── export-onnx-stateless7-streaming-multi.sh
+│   │   ├── joiner-epoch-99-avg-1.int8.onnx
+│   │   ├── joiner-epoch-99-avg-1.onnx
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   └── tokens.txt
+│   ├── sherpa-onnx-streaming-zipformer-en-2023-06-26
+│   │   ├── README.md
+│   │   ├── bpe.model
+│   │   ├── decoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx
+│   │   ├── decoder-epoch-99-avg-1-chunk-16-left-128.onnx
+│   │   ├── encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx
+│   │   ├── encoder-epoch-99-avg-1-chunk-16-left-128.onnx
+│   │   ├── export-onnx-zipformer-online.sh
+│   │   ├── joiner-epoch-99-avg-1-chunk-16-left-128.int8.onnx
+│   │   ├── joiner-epoch-99-avg-1-chunk-16-left-128.onnx
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   └── tokens.txt
+│   ├── sherpa-onnx-streaming-zipformer-en-20M-2023-02-17
+│   │   ├── README.md
+│   │   ├── decoder-epoch-99-avg-1.int8.onnx
+│   │   ├── decoder-epoch-99-avg-1.onnx
+│   │   ├── encoder-epoch-99-avg-1.int8.onnx
+│   │   ├── encoder-epoch-99-avg-1.onnx
+│   │   ├── export-onnx-en-20M.sh
+│   │   ├── joiner-epoch-99-avg-1.int8.onnx
+│   │   ├── joiner-epoch-99-avg-1.onnx
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   └── tokens.txt
+│   ├── sherpa-onnx-whisper-base.en
+│   │   ├── base.en-decoder.int8.onnx
+│   │   ├── base.en-decoder.onnx
+│   │   ├── base.en-encoder.int8.onnx
+│   │   ├── base.en-encoder.onnx
+│   │   ├── base.en-tokens.txt
+│   │   └── test_wavs
+│   │       ├── 0.wav
+│   │       ├── 1.wav
+│   │       ├── 8k.wav
+│   │       └── trans.txt
+│   ├── sherpa-onnx-whisper-distil-large-v2
+│   │   ├── distil-large-v2-decoder.int8.onnx
+│   │   ├── distil-large-v2-encoder.int8.onnx
+│   │   ├── distil-large-v2-tokens.txt
+│   │   └── test_wavs
+│   │       ├── 0.wav
+│   │       ├── 1.wav
+│   │       ├── 8k.wav
+│   │       └── trans.txt
+│   ├── sherpa-onnx-whisper-distil-medium.en
+│   │   ├── distil-medium.en-decoder.int8.onnx
+│   │   ├── distil-medium.en-decoder.onnx
+│   │   ├── distil-medium.en-encoder.int8.onnx
+│   │   ├── distil-medium.en-encoder.onnx
+│   │   ├── distil-medium.en-tokens.txt
+│   │   └── test_wavs
+│   │       ├── 0.wav
+│   │       ├── 1.wav
+│   │       ├── 8k.wav
+│   │       └── trans.txt
+│   ├── sherpa-onnx-whisper-large-v3
+│   │   ├── large-v3-decoder.int8.onnx
+│   │   ├── large-v3-encoder.int8.onnx
+│   │   ├── large-v3-tokens.txt
+│   │   └── test_wavs
+│   │       ├── 0.wav
+│   │       ├── 1.wav
+│   │       ├── 8k.wav
+│   │       └── trans.txt
+│   ├── sherpa-onnx-whisper-turbo
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   ├── turbo-decoder.int8.onnx
+│   │   ├── turbo-encoder.int8.onnx
+│   │   └── turbo-tokens.txt
+│   ├── sherpa-onnx-zipformer-en-2023-06-26
+│   │   ├── README.md
+│   │   ├── decoder-epoch-99-avg-1.int8.onnx
+│   │   ├── decoder-epoch-99-avg-1.onnx
+│   │   ├── encoder-epoch-99-avg-1.int8.onnx
+│   │   ├── encoder-epoch-99-avg-1.onnx
+│   │   ├── export-onnx-zipformer-offline.sh
+│   │   ├── joiner-epoch-99-avg-1.int8.onnx
+│   │   ├── joiner-epoch-99-avg-1.onnx
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   └── tokens.txt
+│   ├── sherpa-onnx-zipformer-large-en-2023-06-26
+│   │   ├── README.md
+│   │   ├── decoder-epoch-99-avg-1.int8.onnx
+│   │   ├── decoder-epoch-99-avg-1.onnx
+│   │   ├── encoder-epoch-99-avg-1.int8.onnx
+│   │   ├── encoder-epoch-99-avg-1.onnx
+│   │   ├── joiner-epoch-99-avg-1.int8.onnx
+│   │   ├── joiner-epoch-99-avg-1.onnx
+│   │   ├── test_wavs
+│   │   │   ├── 0.wav
+│   │   │   ├── 1.wav
+│   │   │   ├── 8k.wav
+│   │   │   └── trans.txt
+│   │   └── tokens.txt
+│   └── sherpa-onnx-zipformer-small-en-2023-06-26
+│       ├── README.md
+│       ├── decoder-epoch-99-avg-1.int8.onnx
+│       ├── decoder-epoch-99-avg-1.onnx
+│       ├── encoder-epoch-99-avg-1.int8.onnx
+│       ├── encoder-epoch-99-avg-1.onnx
+│       ├── export-onnx-zipformer-offline.sh
+│       ├── joiner-epoch-99-avg-1.int8.onnx
+│       ├── joiner-epoch-99-avg-1.onnx
+│       ├── test_wavs
+│       │   ├── 0.wav
+│       │   ├── 1.wav
+│       │   ├── 8k.wav
+│       │   └── trans.txt
+│       └── tokens.txt
+└── tts
+    ├── en_GB-alan-medium.json
+    ├── en_GB-alan-medium.onnx
+    ├── en_GB-alba-medium.json
+    ├── en_GB-alba-medium.onnx
+    ├── en_GB-semaine-medium.json
+    ├── en_GB-semaine-medium.onnx
+    ├── en_GB-southern_english_female-low.json
+    ├── en_GB-southern_english_female-low.onnx
+    ├── en_US-amy-medium.json
+    ├── en_US-amy-medium.onnx
+    ├── en_US-danny-low.json
+    ├── en_US-danny-low.onnx
+    ├── en_US-joe-medium.json
+    ├── en_US-joe-medium.onnx
+    ├── en_US-norman-medium.json
+    └── en_US-norman-medium.onnx

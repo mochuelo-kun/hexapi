@@ -15,11 +15,12 @@ requests = "^2.32.3"
 click = "^8.1.8"
 whisper = "^1.1.10"
 torch = "^2.6.0"
-transformers = "^4.40.0"
-scipy = "^1.13.0"
 # temporarily removing piper stuff until macos install is sorted out
 # piper-phonemize = "^1.1.0"
 # piper-tts = "^1.2.0"
+scipy = "^1.15.2"
+transformers = "^4.49.0"
+sherpa-onnx = "^1.11.0"
 
 [tool.poetry.scripts]
 chrysalis = "chrysalis.cli:cli"

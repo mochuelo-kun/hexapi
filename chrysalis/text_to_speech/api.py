@@ -3,6 +3,7 @@ from .base import TextToSpeechBase
 from .elevenlabs import ElevenLabsTTS
 from .piper_local import PiperLocalTTS
 from .bark import BarkTTS
+from .sherpa_local import SherpaLocalTTS
 import logging
 
 logger = logging.getLogger('chrysalis.tts')
@@ -16,6 +17,7 @@ class TextToSpeechAPI:
             "elevenlabs": ElevenLabsTTS,
             "piper": PiperLocalTTS,
             "bark": BarkTTS,
+            "sherpa": SherpaLocalTTS,
             # Add other implementations here
         }
         

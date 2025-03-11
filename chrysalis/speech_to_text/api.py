@@ -5,23 +5,36 @@ import numpy as np
 from .base import SpeechToTextBase
 from .whisper_api import WhisperAPI
 from .whisper_local import WhisperLocal
+from .sherpa_local import SherpaLocalSTT
 
 logger = logging.getLogger('chrysalis.stt')
 
 class SpeechToTextAPI:
-    def __init__(self, implementation: str = "whisper_api", **kwargs):
+    def __init__(self,
+                 implementation: str,
+                 model_name: Optional[str] = None,
+                 **kwargs):
         self.implementation_map = {
             "whisper_api": WhisperAPI,
             "whisper_local": WhisperLocal,
-            # Add other implementations here
+            "sherpa": SherpaLocalSTT,
         }
         
         if implementation not in self.implementation_map:
             raise ValueError(f"Unknown implementation: {implementation}")
+            
+        if implementation == "sherpa":
+            self.implementation = self.implementation_map[implementation](
+                model_name=model_name,
+                enable_diarization=kwargs.get("enable_diarization", False)
+            )
+        else:
+            self.implementation = self.implementation_map[implementation](
+                model_name=model_name
+            ) if model_name else self.implementation_map[implementation]()
         
         logger.info("Initializing STT with implementation: %s", implementation)
         start = time.time()
-        self.implementation = self.implementation_map[implementation](**kwargs)
         logger.debug("STT implementation initialized in %.2fs", time.time() - start)
     
     def transcribe(self, 

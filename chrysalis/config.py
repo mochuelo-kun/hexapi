@@ -10,10 +10,8 @@ class Config:
     # Whisper Local
     WHISPER_MODEL = os.getenv("WHISPER_MODEL")
     
-    # Piper
-    PIPER_MODEL_DIR = os.getenv("PIPER_MODEL_DIR")
-    # PIPER_MODEL_NAME = os.getenv("PIPER_MODEL_NAME", "en_US-amy-medium")
-    # PIPER_SAMPLE_RATE = int(os.getenv("PIPER_SAMPLE_RATE", "22050"))
+    # ONNX Models (Piper, Sherpa)
+    ONNX_MODEL_DIR = os.getenv("ONNX_MODEL_DIR")
     
     # ElevenLabs
     ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")

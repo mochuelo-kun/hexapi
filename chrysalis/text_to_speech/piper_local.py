@@ -28,7 +28,7 @@ class PiperLocalTTS(TextToSpeechBase):
             tts_model: Name of voice model (e.g. 'en_US-amy-medium')
             sample_rate: Output audio sample rate
         """
-        model_dir = Path(Config.PIPER_MODEL_DIR)
+        model_dir = Path(Config.ONNX_MODEL_DIR) / "tts"
         model_path = model_dir / f"{tts_model}.onnx"
         config_path = model_dir / f"{tts_model}.json"
         

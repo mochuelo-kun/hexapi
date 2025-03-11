@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Optional
+from typing import Optional, Union, Dict, Any
 from dataclasses import dataclass
 from .speech_to_text.api import SpeechToTextAPI
 from .llm_query.api import LLMQueryAPI
@@ -17,6 +17,113 @@ class ChrysalisConfig:
     llm_model: str = "ollama:llama2"
     tts_implementation: str = "elevenlabs"
     tts_model: Optional[str] = None
+
+class Pipeline:
+    def __init__(self,
+                 stt_engine: str = "sherpa_local",
+                 tts_engine: str = "sherpa_local",
+                 llm_engine: str = "openai",
+                 enable_diarization: bool = False,
+                 **kwargs):
+        """Initialize the pipeline
+        
+        Args:
+            stt_engine: Speech-to-text engine to use
+            tts_engine: Text-to-speech engine to use
+            llm_engine: Language model engine to use
+            enable_diarization: Whether to enable speaker diarization
+            **kwargs: Additional engine-specific parameters including:
+                stt_params: Dict with optional keys:
+                    - recognition_model: Name of speaker recognition model
+                    - segmentation_model: Name of speaker segmentation model
+                tts_params: Dict of TTS parameters
+                llm_params: Dict of LLM parameters
+        """
+        self.enable_diarization = enable_diarization
+        
+        # Extract STT parameters
+        stt_params = kwargs.get("stt_params", {})
+        if enable_diarization:
+            # Add diarization-specific parameters if provided
+            stt_params["enable_diarization"] = True
+            if "recognition_model" in stt_params:
+                stt_params["recognition_model"] = stt_params["recognition_model"]
+            if "segmentation_model" in stt_params:
+                stt_params["segmentation_model"] = stt_params["segmentation_model"]
+        
+        # Initialize STT
+        if stt_engine == "sherpa_local":
+            from .speech_to_text.sherpa_local import SherpaLocalSTT
+            self.stt = SherpaLocalSTT(**stt_params)
+        else:
+            raise ValueError(f"Unknown STT engine: {stt_engine}")
+            
+        # Initialize TTS
+        if tts_engine == "sherpa_local":
+            from .text_to_speech.sherpa_local import SherpaLocalTTS
+            self.tts = SherpaLocalTTS(**kwargs.get("tts_params", {}))
+        else:
+            raise ValueError(f"Unknown TTS engine: {tts_engine}")
+            
+        # Initialize LLM
+        if llm_engine == "openai":
+            from .llm_query.openai import OpenAIQuery
+            self.llm = OpenAIQuery(**kwargs.get("llm_params", {}))
+        else:
+            raise ValueError(f"Unknown LLM engine: {llm_engine}")
+
+    def transcribe_to_text(self, audio_input: str) -> Union[str, Dict[str, Any]]:
+        """Transcribe audio file to text
+        
+        Args:
+            audio_input: Path to audio file
+            
+        Returns:
+            If diarization disabled: transcribed text
+            If diarization enabled: dict with text and speaker segments
+        """
+        logger.info("Transcribing audio to text: %s", audio_input)
+        return self.stt.transcribe_file(audio_input)
+
+    def process_audio_query(self, 
+                          audio_input: str,
+                          system_prompt: Optional[str] = None,
+                          output_audio: Optional[str] = None,
+                          **kwargs) -> Dict[str, Any]:
+        """Process an audio query through the full pipeline
+        
+        Args:
+            audio_input: Path to input audio file
+            system_prompt: Optional system prompt for LLM
+            output_audio: Optional path to save response audio
+            **kwargs: Additional parameters for TTS
+            
+        Returns:
+            Dict containing:
+                - transcription: Input transcription (str or dict if diarized)
+                - response: LLM response text
+                - audio_path: Path to response audio if generated
+        """
+        # Transcribe audio
+        transcription = self.transcribe_to_text(audio_input)
+        
+        # Extract text for LLM query
+        query_text = transcription["text"] if self.enable_diarization else transcription
+        
+        # Query LLM
+        response = self.llm.query(query_text, system_prompt)
+        
+        # Generate audio response if requested
+        audio_path = None
+        if output_audio:
+            self.tts.synthesize(response, output_audio, **kwargs)
+            audio_path = output_audio
+            
+        return {
+            "transcription": transcription,
+            "response": response,
+            "audio_path": audio_path
+        }
 
 class ChrysalisPipeline:
     def __init__(self, config: Optional[ChrysalisConfig] = None):
