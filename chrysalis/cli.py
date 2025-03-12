@@ -47,16 +47,22 @@ def transcribe(audio_input: str, enable_diarization: bool, recognition_model: st
     
     # Format output
     if format == 'json':
-        if not enable_diarization:
-            result = {"text": result}
-        output_text = json.dumps(result, indent=2)
+        if enable_diarization and isinstance(result, dict):
+            output_text = json.dumps(result, indent=2)
+        else:
+            output_text = json.dumps({"text": result}, indent=2)
     else:
-        if enable_diarization:
+        if enable_diarization and isinstance(result, dict) and "segments" in result:
             # Format diarized text nicely
-            segments = result["segments"]
             lines = []
-            for seg in segments:
-                lines.append(f"[Speaker {seg['speaker']}] {seg['text']}")
+            for segment in result["segments"]:
+                if isinstance(segment, dict):
+                    start = segment.get("start", 0)
+                    speaker = segment.get("speaker", "Unknown")
+                    text = segment.get("text", "")
+                    lines.append(f"[{start:.2f}s] (Speaker {speaker}) {text}")
+                else:
+                    lines.append(str(segment))
             output_text = "\n".join(lines)
         else:
             output_text = result
