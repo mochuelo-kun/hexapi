@@ -19,7 +19,8 @@ DEFAULT_SPEED = 1.0
 class SherpaLocalTTS(TextToSpeechBase):
     def __init__(self, 
                  tts_model: str = DEFAULT_TTS_MODEL,
-                 sample_rate: int = DEFAULT_SAMPLE_RATE):
+                 sample_rate: int = DEFAULT_SAMPLE_RATE,
+                 **kwargs):
         """
         Initialize Sherpa-ONNX TTS
         
@@ -35,29 +36,50 @@ class SherpaLocalTTS(TextToSpeechBase):
             
             model_dir = Path(Config.ONNX_MODEL_DIR) / "tts"
             model_path = model_dir / f"{tts_model}.onnx"
-            config_path = model_dir / f"{tts_model}.json"
+
+            # Look for tokens file - might be named {model}.tokens.txt or just tokens.txt
+            tokens_path = model_dir / f"{tts_model}.tokens.txt"
+
+            if not tokens_path.exists():
+                # Try original config file
+                tokens_path = model_dir / f"{tts_model}.json"
+                
+                # If that doesn't exist, try .onnx.json (Piper format)
+                if not tokens_path.exists():
+                    tokens_path = model_dir / f"{tts_model}.onnx.json"
             
-            if not model_path.exists() or not config_path.exists():
+            if not model_path.exists():
                 available_models = [p.stem for p in model_dir.glob("*.onnx")]
                 raise FileNotFoundError(
-                    f"Model files not found in {model_dir}. "
-                    f"Expected {model_path.name} and {config_path.name}\n"
+                    f"Model file not found: {model_path}\n"
                     f"Available models: {', '.join(available_models)}"
                 )
-            
-            config = sherpa_onnx.OfflineTtsConfig(
-                model=sherpa_onnx.OfflineTtsModelConfig(
-                    vits=str(model_path)
-                ),
-                tokens=str(config_path),
-                data_dir=str(model_dir),
-                sample_rate=sample_rate
-            )
+                
+            if not tokens_path.exists():
+                raise FileNotFoundError(
+                    f"Tokens file not found for model {tts_model}. "
+                    f"Expected one of: {tts_model}.tokens.txt, {tts_model}.json, or {tts_model}.onnx.json"
+                )
             
             logger.info("Loading Sherpa-ONNX TTS model: %s", tts_model)
+            logger.info("  Model: %s", model_path)
+            logger.info("  Tokens: %s", tokens_path)
+            
+            # # Simplified config creation
+            # # Use direct parameter passing instead of building config objects manually
+            # # This matches the pattern seen in sherpa-onnx examples
+            tts_config = sherpa_onnx.OfflineTtsConfig()
+            tts_config.model.vits.model = str(model_path)
+            tts_config.model.vits.tokens = str(tokens_path)
+            # tts_config.model.vits.data_dir = str(model_dir)
+            tts_config.model.vits.data_dir = Config.ESPEAK_DATA_PATH
+            # tts_config.model.num_threads = 1
+            tts_config.model.debug = True
+
             load_start = time.time()
-            self.synthesizer = sherpa_onnx.OfflineTts(config)
+            self.synthesizer = sherpa_onnx.OfflineTts(tts_config)
             logger.info("TTS model loaded in %.2fs", time.time() - load_start)
+            
             
         except ImportError as e:
             logger.error("Failed to import Sherpa-ONNX dependencies: %s", e)
@@ -89,17 +111,22 @@ class SherpaLocalTTS(TextToSpeechBase):
         # Generate audio
         audio_data = self.synthesizer.generate(
             text=text,
-            speaker=speaker_id,
+            # speaker=speaker_id,
             speed=speed
         )
         
         # Save to file
-        sf.write(output_file, audio_data, self.sample_rate)
+        sf.write(
+            output_file,
+            audio_data.samples,
+            samplerate=audio_data.sample_rate,
+            # subtype="PCM_16",
+        )
         
         # Calculate metrics
         duration = time.time() - start_time
-        audio_duration = len(audio_data) / self.sample_rate
+        audio_duration = len(audio_data.samples) / audio_data.sample_rate
         logger.info(
             "Synthesis completed in %.2fs (audio length: %.2fs, %.1fx realtime)", 
             duration, audio_duration, audio_duration/duration
-        ) 
+        )

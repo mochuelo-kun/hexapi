@@ -1,8 +1,13 @@
 import click
 import json
+import logging
 from pathlib import Path
 from .pipeline import Pipeline
 from .config import Config
+from .logging import setup_logging
+
+# Initialize logging at the module level
+logger = setup_logging(level=logging.DEBUG)
 
 @click.group()
 def cli():
@@ -64,6 +69,52 @@ def transcribe(audio_input: str, enable_diarization: bool, recognition_model: st
         click.echo(output_text)
 
 @cli.command()
+@click.argument('text')
+@click.option('--model', '-m', help='LLM model to use (e.g. "ollama:llama2")')
+@click.option('--system-prompt', '-s', help='System prompt for LLM')
+@click.option('--format', '-f', type=click.Choice(['text', 'json']), default='text',
+              help='Output format (text or json)')
+def query(text: str, model: str, system_prompt: str, format: str):
+    """Query LLM with text input"""
+    pipeline = Pipeline(
+        llm_engine="openai" if "openai" in model else "ollama",
+        llm_params={"model": model} if model else {}
+    )
+    
+    response = pipeline.llm.query(text, system_prompt)
+    
+    if format == 'json':
+        click.echo(json.dumps({
+            "input": text,
+            "response": response
+        }, indent=2))
+    else:
+        click.echo(response)
+
+@cli.command()
+@click.argument('text')
+@click.option('--output', '-o', type=click.Path(), required=True, help='Output audio file')
+@click.option('--tts-model', '-m', help='TTS model to use')
+@click.option('--speaker-id', type=int, default=0, help='Speaker ID for multi-speaker models')
+@click.option('--speed', type=float, default=1.0, help='Speech speed factor')
+def speak(text: str, output: str, tts_model: str, speaker_id: int, speed: float):
+    """Synthesize text to speech"""
+    pipeline = Pipeline(
+        tts_engine="sherpa_local",
+        tts_params={
+            "tts_model": tts_model,
+            "speaker_id": speaker_id,
+            "speed": speed
+        } if tts_model else {
+            "speaker_id": speaker_id,
+            "speed": speed
+        }
+    )
+    
+    pipeline.tts.synthesize(text, output)
+    click.echo(f"Audio saved to: {output}")
+
+@cli.command()
 @click.argument('audio_input', type=click.Path(exists=True))
 @click.option('--enable-diarization', is_flag=True, help='Enable speaker diarization')
 @click.option('--recognition-model', help='Speaker recognition model name (requires --enable-diarization)')
@@ -75,10 +126,10 @@ def transcribe(audio_input: str, enable_diarization: bool, recognition_model: st
 @click.option('--speed', type=float, default=1.0, help='TTS speech speed')
 @click.option('--format', '-f', type=click.Choice(['text', 'json']), default='text',
               help='Output format (text or json)')
-def query(audio_input: str, enable_diarization: bool, recognition_model: str,
-          segmentation_model: str, use_int8: bool, system_prompt: str, 
-          output_audio: str, speaker_id: int, speed: float, format: str):
-    """Process audio query through the full pipeline with optional diarization
+def pipeline(audio_input: str, enable_diarization: bool, recognition_model: str,
+            segmentation_model: str, use_int8: bool, system_prompt: str, 
+            output_audio: str, speaker_id: int, speed: float, format: str):
+    """Process audio through the full pipeline (STT -> LLM -> TTS)
     
     Models should be placed in {ONNX_MODEL_DIR}/diarization/{recognition,segmentation}/
     """
@@ -86,22 +137,24 @@ def query(audio_input: str, enable_diarization: bool, recognition_model: str,
     if (recognition_model or segmentation_model) and not enable_diarization:
         raise click.UsageError("--recognition-model and --segmentation-model require --enable-diarization")
     
-    # Initialize pipeline with diarization options
+    # Initialize pipeline with all options
     pipeline = Pipeline(
         enable_diarization=enable_diarization,
         stt_params={
             "recognition_model": recognition_model,
             "segmentation_model": segmentation_model,
             "use_int8": use_int8
-        } if enable_diarization else {"use_int8": use_int8}
+        } if enable_diarization else {"use_int8": use_int8},
+        tts_params={
+            "speaker_id": speaker_id,
+            "speed": speed
+        }
     )
     
     result = pipeline.process_audio_query(
         audio_input,
         system_prompt=system_prompt,
-        output_audio=output_audio,
-        speaker_id=speaker_id,
-        speed=speed
+        output_audio=output_audio
     )
     
     # Format output

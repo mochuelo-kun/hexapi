@@ -30,7 +30,7 @@ class PiperLocalTTS(TextToSpeechBase):
         """
         model_dir = Path(Config.ONNX_MODEL_DIR) / "tts"
         model_path = model_dir / f"{tts_model}.onnx"
-        config_path = model_dir / f"{tts_model}.json"
+        config_path = model_dir / f"{tts_model}.onnx.json"
         
         if not model_path.exists() or not config_path.exists():
             raise FileNotFoundError(

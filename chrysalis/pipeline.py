@@ -2,12 +2,28 @@ import logging
 import time
 from typing import Optional, Union, Dict, Any
 from dataclasses import dataclass
+import psutil
+import os
+from pathlib import Path
 from .speech_to_text.api import SpeechToTextAPI
 from .llm_query.api import LLMQueryAPI
 from .text_to_speech.api import TextToSpeechAPI
 from .logging import setup_logging
 
 logger = logging.getLogger('chrysalis.pipeline')
+
+def get_memory_usage():
+    """Get current process memory usage in MB"""
+    process = psutil.Process(os.getpid())
+    return process.memory_info().rss / 1024 / 1024
+
+def log_memory_change(start_mem: float, operation: str):
+    """Log memory change after an operation"""
+    current_mem = get_memory_usage()
+    delta = current_mem - start_mem
+    logger.debug("Memory after %s: %.1fMB (%.1fMB change)", 
+                operation, current_mem, delta)
+    return current_mem
 
 @dataclass
 class ChrysalisConfig:
@@ -39,38 +55,103 @@ class Pipeline:
                 tts_params: Dict of TTS parameters
                 llm_params: Dict of LLM parameters
         """
+        init_start = time.time()
+        start_mem = get_memory_usage()
+        logger.info("Initializing Pipeline configuration")
+        
+        # Store configuration for lazy initialization
+        self.stt_engine = stt_engine
+        self.tts_engine = tts_engine
+        self.llm_engine = llm_engine
         self.enable_diarization = enable_diarization
+        self.kwargs = kwargs
         
-        # Extract STT parameters
-        stt_params = kwargs.get("stt_params", {})
-        if enable_diarization:
-            # Add diarization-specific parameters if provided
-            stt_params["enable_diarization"] = True
-            if "recognition_model" in stt_params:
-                stt_params["recognition_model"] = stt_params["recognition_model"]
-            if "segmentation_model" in stt_params:
-                stt_params["segmentation_model"] = stt_params["segmentation_model"]
+        # Initialize components as None
+        self._stt = None
+        self._tts = None
+        self._llm = None
         
-        # Initialize STT
-        if stt_engine == "sherpa_local":
-            from .speech_to_text.sherpa_local import SherpaLocalSTT
-            self.stt = SherpaLocalSTT(**stt_params)
-        else:
-            raise ValueError(f"Unknown STT engine: {stt_engine}")
+        logger.debug("Pipeline configuration initialized in %.3fs", time.time() - init_start)
+        log_memory_change(start_mem, "pipeline initialization")
+    
+    @property
+    def stt(self):
+        """Lazy initialization of STT component"""
+        if self._stt is None:
+            init_start = time.time()
+            start_mem = get_memory_usage()
+            logger.info("Initializing STT engine: %s", self.stt_engine)
             
-        # Initialize TTS
-        if tts_engine == "sherpa_local":
-            from .text_to_speech.sherpa_local import SherpaLocalTTS
-            self.tts = SherpaLocalTTS(**kwargs.get("tts_params", {}))
-        else:
-            raise ValueError(f"Unknown TTS engine: {tts_engine}")
+            # Extract STT parameters
+            stt_params = self.kwargs.get("stt_params", {})
+            if self.enable_diarization:
+                stt_params["enable_diarization"] = True
+                logger.debug("Enabling diarization with params: %s", stt_params)
             
-        # Initialize LLM
-        if llm_engine == "openai":
-            from .llm_query.openai import OpenAIQuery
-            self.llm = OpenAIQuery(**kwargs.get("llm_params", {}))
-        else:
-            raise ValueError(f"Unknown LLM engine: {llm_engine}")
+            # Initialize STT
+            try:
+                if self.stt_engine == "sherpa_local":
+                    from .speech_to_text.sherpa_local import SherpaLocalSTT
+                    self._stt = SherpaLocalSTT(**stt_params)
+                else:
+                    raise ValueError(f"Unknown STT engine: {self.stt_engine}")
+                
+                init_time = time.time() - init_start
+                logger.info("STT engine initialized successfully in %.3fs", init_time)
+                log_memory_change(start_mem, "STT initialization")
+            except Exception as e:
+                logger.error("Failed to initialize STT engine: %s", e, exc_info=True)
+                raise
+        
+        return self._stt
+    
+    @property
+    def tts(self):
+        """Lazy initialization of TTS component"""
+        if self._tts is None:
+            init_start = time.time()
+            start_mem = get_memory_usage()
+            logger.info("Initializing TTS engine: %s", self.tts_engine)
+            
+            try:
+                if self.tts_engine == "sherpa_local":
+                    from .text_to_speech.sherpa_local import SherpaLocalTTS
+                    self._tts = SherpaLocalTTS(**self.kwargs.get("tts_params", {}))
+                else:
+                    raise ValueError(f"Unknown TTS engine: {self.tts_engine}")
+                
+                init_time = time.time() - init_start
+                logger.info("TTS engine initialized successfully in %.3fs", init_time)
+                log_memory_change(start_mem, "TTS initialization")
+            except Exception as e:
+                logger.error("Failed to initialize TTS engine: %s", e, exc_info=True)
+                raise
+        
+        return self._tts
+    
+    @property
+    def llm(self):
+        """Lazy initialization of LLM component"""
+        if self._llm is None:
+            init_start = time.time()
+            start_mem = get_memory_usage()
+            logger.info("Initializing LLM engine: %s", self.llm_engine)
+            
+            try:
+                if self.llm_engine == "openai":
+                    from .llm_query.openai import OpenAIQuery
+                    self._llm = OpenAIQuery(**self.kwargs.get("llm_params", {}))
+                else:
+                    raise ValueError(f"Unknown LLM engine: {self.llm_engine}")
+                
+                init_time = time.time() - init_start
+                logger.info("LLM engine initialized successfully in %.3fs", init_time)
+                log_memory_change(start_mem, "LLM initialization")
+            except Exception as e:
+                logger.error("Failed to initialize LLM engine: %s", e, exc_info=True)
+                raise
+        
+        return self._llm
 
     def transcribe_to_text(self, audio_input: str) -> Union[str, Dict[str, Any]]:
         """Transcribe audio file to text
@@ -82,8 +163,29 @@ class Pipeline:
             If diarization disabled: transcribed text
             If diarization enabled: dict with text and speaker segments
         """
-        logger.info("Transcribing audio to text: %s", audio_input)
-        return self.stt.transcribe_file(audio_input)
+        start_time = time.time()
+        start_mem = get_memory_usage()
+        logger.info("Starting transcription of: %s", audio_input)
+        
+        try:
+            result = self.stt.transcribe_file(audio_input)
+            duration = time.time() - start_time
+            
+            if isinstance(result, dict):
+                text_preview = result["text"][:100] + "..." if len(result["text"]) > 100 else result["text"]
+                logger.info("Transcription completed in %.3fs with diarization", duration)
+                logger.debug("Transcribed text: %s", text_preview)
+            else:
+                text_preview = result[:100] + "..." if len(result) > 100 else result
+                logger.info("Transcription completed in %.3fs", duration)
+                logger.debug("Transcribed text: %s", text_preview)
+            
+            log_memory_change(start_mem, "transcription")
+            return result
+            
+        except Exception as e:
+            logger.error("Transcription failed after %.3fs: %s", time.time() - start_time, e, exc_info=True)
+            raise
 
     def process_audio_query(self, 
                           audio_input: str,
@@ -104,26 +206,96 @@ class Pipeline:
                 - response: LLM response text
                 - audio_path: Path to response audio if generated
         """
-        # Transcribe audio
-        transcription = self.transcribe_to_text(audio_input)
+        pipeline_start = time.time()
+        start_mem = get_memory_usage()
+        logger.info("Starting audio query pipeline")
+        timings = {}
+        memory_changes = {}
         
-        # Extract text for LLM query
-        query_text = transcription["text"] if self.enable_diarization else transcription
-        
-        # Query LLM
-        response = self.llm.query(query_text, system_prompt)
-        
-        # Generate audio response if requested
-        audio_path = None
-        if output_audio:
-            self.tts.synthesize(response, output_audio, **kwargs)
-            audio_path = output_audio
+        try:
+            # Transcribe audio
+            stt_start = time.time()
+            stt_start_mem = get_memory_usage()
+            transcription = self.transcribe_to_text(audio_input)
+            timings["stt"] = time.time() - stt_start
+            memory_changes["stt"] = get_memory_usage() - stt_start_mem
             
-        return {
-            "transcription": transcription,
-            "response": response,
-            "audio_path": audio_path
-        }
+            # Extract text for LLM query
+            query_text = transcription["text"] if self.enable_diarization else transcription
+            
+            # Query LLM
+            llm_start = time.time()
+            llm_start_mem = get_memory_usage()
+            logger.info("Querying LLM with transcribed text")
+            response = self.llm.query(query_text, system_prompt)
+            timings["llm"] = time.time() - llm_start
+            memory_changes["llm"] = get_memory_usage() - llm_start_mem
+            logger.info("LLM response received in %.3fs", timings["llm"])
+            logger.debug("LLM response: %s", response[:100] + "..." if len(response) > 100 else response)
+            
+            # Generate audio response if requested
+            audio_path = None
+            if output_audio:
+                tts_start = time.time()
+                tts_start_mem = get_memory_usage()
+                logger.info("Generating audio response to: %s", output_audio)
+                self.tts.synthesize(response, output_audio, **kwargs)
+                timings["tts"] = time.time() - tts_start
+                memory_changes["tts"] = get_memory_usage() - tts_start_mem
+                logger.info("Audio response generated in %.3fs", timings["tts"])
+                audio_path = output_audio
+            
+            total_time = time.time() - pipeline_start
+            total_mem_change = get_memory_usage() - start_mem
+            
+            logger.info("Pipeline completed in %.3fs (memory change: %.1fMB)", 
+                       total_time, total_mem_change)
+            
+            for component, timing in timings.items():
+                logger.debug("%s: %.3fs (%.1f%% of total time, %.1fMB memory change)", 
+                           component.upper(), timing, 
+                           (timing/total_time)*100,
+                           memory_changes[component])
+            
+            return {
+                "transcription": transcription,
+                "response": response,
+                "audio_path": audio_path,
+                "timings": timings,
+                "memory_changes": memory_changes
+            }
+            
+        except Exception as e:
+            logger.error("Pipeline failed after %.3fs: %s", 
+                        time.time() - pipeline_start, e, exc_info=True)
+            raise
+    
+    def cleanup(self):
+        """Clean up resources and unload models"""
+        start_mem = get_memory_usage()
+        logger.info("Starting pipeline cleanup")
+        
+        # Clean up STT
+        if self._stt is not None:
+            logger.debug("Unloading STT models")
+            self._stt = None
+        
+        # Clean up TTS
+        if self._tts is not None:
+            logger.debug("Unloading TTS models")
+            self._tts = None
+        
+        # Clean up LLM
+        if self._llm is not None:
+            logger.debug("Unloading LLM models")
+            self._llm = None
+        
+        # Force garbage collection
+        import gc
+        gc.collect()
+        
+        log_memory_change(start_mem, "cleanup")
+        logger.info("Pipeline cleanup completed")
 
 class ChrysalisPipeline:
     def __init__(self, config: Optional[ChrysalisConfig] = None):
@@ -131,18 +303,40 @@ class ChrysalisPipeline:
         
         logger.info("Initializing Chrysalis pipeline with config: %s", self.config)
         
-        # Initialize components
-        start = time.time()
-        self.stt = SpeechToTextAPI(
-            implementation=self.config.stt_implementation,
-            model_name=self.config.stt_model
-        )
-        self.llm = LLMQueryAPI()
-        self.tts = TextToSpeechAPI(
-            implementation=self.config.tts_implementation,
-            tts_model=self.config.tts_model,
-        )
-        logger.debug("Pipeline components initialized in %.2fs", time.time() - start)
+        # Store configuration for lazy initialization
+        self._stt = None
+        self._llm = None
+        self._tts = None
+    
+    @property
+    def stt(self):
+        """Lazy initialization of STT component"""
+        if self._stt is None:
+            logger.info("Initializing STT component: %s", self.config.stt_implementation)
+            self._stt = SpeechToTextAPI(
+                implementation=self.config.stt_implementation,
+                model_name=self.config.stt_model
+            )
+        return self._stt
+    
+    @property
+    def llm(self):
+        """Lazy initialization of LLM component"""
+        if self._llm is None:
+            logger.info("Initializing LLM component")
+            self._llm = LLMQueryAPI()
+        return self._llm
+    
+    @property
+    def tts(self):
+        """Lazy initialization of TTS component"""
+        if self._tts is None:
+            logger.info("Initializing TTS component: %s", self.config.tts_implementation)
+            self._tts = TextToSpeechAPI(
+                implementation=self.config.tts_implementation,
+                tts_model=self.config.tts_model,
+            )
+        return self._tts
     
     def run(self,
             audio_file: Optional[str] = None,

@@ -317,19 +317,19 @@
 │       │   └── trans.txt
 │       └── tokens.txt
 └── tts
-    ├── en_GB-alan-medium.json
     ├── en_GB-alan-medium.onnx
-    ├── en_GB-alba-medium.json
+    ├── en_GB-alan-medium.onnx.json
     ├── en_GB-alba-medium.onnx
-    ├── en_GB-semaine-medium.json
+    ├── en_GB-alba-medium.onnx.json
     ├── en_GB-semaine-medium.onnx
-    ├── en_GB-southern_english_female-low.json
+    ├── en_GB-semaine-medium.onnx.json
     ├── en_GB-southern_english_female-low.onnx
-    ├── en_US-amy-medium.json
+    ├── en_GB-southern_english_female-low.onnx.json
     ├── en_US-amy-medium.onnx
-    ├── en_US-danny-low.json
+    ├── en_US-amy-medium.onnx.json
     ├── en_US-danny-low.onnx
-    ├── en_US-joe-medium.json
+    ├── en_US-danny-low.onnx.json
     ├── en_US-joe-medium.onnx
-    ├── en_US-norman-medium.json
-    └── en_US-norman-medium.onnx
+    ├── en_US-joe-medium.onnx.json
+    ├── en_US-norman-medium.onnx
+    └── en_US-norman-medium.onnx.json

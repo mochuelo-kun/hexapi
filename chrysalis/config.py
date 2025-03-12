@@ -12,6 +12,7 @@ class Config:
     
     # ONNX Models (Piper, Sherpa)
     ONNX_MODEL_DIR = os.getenv("ONNX_MODEL_DIR")
+    ESPEAK_DATA_PATH = os.getenv("ESPEAK_DATA_PATH")
     
     # ElevenLabs
     ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
