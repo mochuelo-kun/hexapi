@@ -2,7 +2,7 @@ import click
 import json
 import logging
 from pathlib import Path
-from .pipeline import Pipeline
+from .pipeline import Pipeline, PipelineConfig
 from .config import Config
 from .logging import setup_logging
 
@@ -33,15 +33,16 @@ def transcribe(audio_input: str, enable_diarization: bool, recognition_model: st
     if (recognition_model or segmentation_model) and not enable_diarization:
         raise click.UsageError("--recognition-model and --segmentation-model require --enable-diarization")
     
-    # Initialize pipeline with diarization options
-    pipeline = Pipeline(
+    # Initialize pipeline config
+    config = PipelineConfig(
         enable_diarization=enable_diarization,
-        stt_params={
-            "recognition_model": recognition_model,
-            "segmentation_model": segmentation_model,
-            "use_int8": use_int8
-        } if enable_diarization else {"use_int8": use_int8}
+        recognition_model=recognition_model,
+        segmentation_model=segmentation_model,
+        use_int8=use_int8
     )
+    
+    # Initialize pipeline with configuration
+    pipeline = Pipeline(config=config)
     
     result = pipeline.transcribe_to_text(audio_input)
     
@@ -82,12 +83,18 @@ def transcribe(audio_input: str, enable_diarization: bool, recognition_model: st
               help='Output format (text or json)')
 def query(text: str, model: str, system_prompt: str, format: str):
     """Query LLM with text input"""
-    pipeline = Pipeline(
-        llm_engine="openai" if "openai" in model else "ollama",
-        llm_params={"model": model} if model else {}
-    )
+    config = PipelineConfig()
+    if model:
+        # Determine implementation from model name
+        if "openai" in model.lower():
+            config.llm_implementation = "openai"
+        else:
+            config.llm_implementation = "ollama"
+        config.llm_model = model
     
-    response = pipeline.llm.query(text, system_prompt)
+    pipeline = Pipeline(config=config)
+    
+    response = pipeline.query_only(text, system_prompt)
     
     if format == 'json':
         click.echo(json.dumps({
@@ -105,19 +112,16 @@ def query(text: str, model: str, system_prompt: str, format: str):
 @click.option('--speed', type=float, default=1.0, help='Speech speed factor')
 def speak(text: str, output: str, tts_model: str, speaker_id: int, speed: float):
     """Synthesize text to speech"""
-    pipeline = Pipeline(
-        tts_engine="sherpa_local",
-        tts_params={
-            "tts_model": tts_model,
-            "speaker_id": speaker_id,
-            "speed": speed
-        } if tts_model else {
-            "speaker_id": speaker_id,
-            "speed": speed
-        }
+    config = PipelineConfig(
+        tts_implementation="sherpa_local",
+        tts_model=tts_model,
+        speaker_id=speaker_id,
+        speed=speed
     )
     
-    pipeline.tts.synthesize(text, output)
+    pipeline = Pipeline(config=config)
+    
+    pipeline.synthesize_only(text, output)
     click.echo(f"Audio saved to: {output}")
 
 @cli.command()
@@ -143,19 +147,19 @@ def pipeline(audio_input: str, enable_diarization: bool, recognition_model: str,
     if (recognition_model or segmentation_model) and not enable_diarization:
         raise click.UsageError("--recognition-model and --segmentation-model require --enable-diarization")
     
-    # Initialize pipeline with all options
-    pipeline = Pipeline(
+    # Initialize pipeline config
+    config = PipelineConfig(
+        stt_implementation="sherpa_local",
         enable_diarization=enable_diarization,
-        stt_params={
-            "recognition_model": recognition_model,
-            "segmentation_model": segmentation_model,
-            "use_int8": use_int8
-        } if enable_diarization else {"use_int8": use_int8},
-        tts_params={
-            "speaker_id": speaker_id,
-            "speed": speed
-        }
+        recognition_model=recognition_model,
+        segmentation_model=segmentation_model,
+        use_int8=use_int8,
+        speaker_id=speaker_id,
+        speed=speed
     )
+    
+    # Initialize pipeline with configuration
+    pipeline = Pipeline(config=config)
     
     result = pipeline.process_audio_query(
         audio_input,
@@ -168,7 +172,7 @@ def pipeline(audio_input: str, enable_diarization: bool, recognition_model: str,
         click.echo(json.dumps(result, indent=2))
     else:
         click.echo("\nTranscription:")
-        if enable_diarization:
+        if enable_diarization and isinstance(result["transcription"], dict):
             for seg in result["transcription"]["segments"]:
                 click.echo(f"[Speaker {seg['speaker']}] {seg['text']}")
         else:
