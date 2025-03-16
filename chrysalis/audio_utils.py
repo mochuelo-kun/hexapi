@@ -5,6 +5,9 @@ import logging
 import os
 import tempfile
 from typing import Optional, Tuple
+import curses
+import queue
+from contextlib import contextmanager
 
 # Default audio settings
 DEFAULT_SAMPLE_RATE = 16000
@@ -48,17 +51,29 @@ def load_audio_file(file_path: str, sample_rate: Optional[int] = None) -> Tuple[
         logger.error(f"Error loading audio file {file_path}: {e}")
         raise
 
-def record_audio_from_microphone(duration: float = DEFAULT_MIC_DURATION, 
-                                sample_rate: int = DEFAULT_SAMPLE_RATE) -> Tuple[np.ndarray, int]:
+def record_audio_from_microphone(duration: Optional[float] = None,
+                               sample_rate: int = DEFAULT_SAMPLE_RATE,
+                               interactive: bool = False) -> Tuple[np.ndarray, int]:
     """Record audio from microphone
     
     Args:
-        duration: Recording duration in seconds
+        duration: Recording duration in seconds (None for interactive mode)
         sample_rate: Sample rate in Hz
+        interactive: If True, use interactive recording mode (spacebar to start/stop)
         
     Returns:
         Tuple of (audio_data, sample_rate)
     """
+    if not interactive and duration is None:
+        duration = DEFAULT_MIC_DURATION
+        
+    if interactive:
+        return _record_interactive(sample_rate)
+    else:
+        return _record_fixed_duration(duration, sample_rate)
+
+def _record_fixed_duration(duration: float, sample_rate: int) -> Tuple[np.ndarray, int]:
+    """Record audio for a fixed duration"""
     logger.info(f"Recording {duration}s of audio at {sample_rate}Hz...")
     
     try:
@@ -71,6 +86,89 @@ def record_audio_from_microphone(duration: float = DEFAULT_MIC_DURATION,
         
     except Exception as e:
         logger.error(f"Error recording audio from microphone: {e}")
+        raise
+
+def _record_interactive(sample_rate: int) -> Tuple[np.ndarray, int]:
+    """Record audio interactively using spacebar to start/stop"""
+    # Create a queue to store audio chunks
+    audio_queue = queue.Queue()
+    recording = False
+    done = False
+    
+    def audio_callback(indata, frames, time, status):
+        """Callback for audio input"""
+        if status:
+            logger.warning(f"Audio input status: {status}")
+        if recording:
+            audio_queue.put(indata.copy())
+    
+    @contextmanager
+    def setup_curses():
+        """Setup and cleanup curses"""
+        stdscr = curses.initscr()
+        curses.noecho()  # Don't echo keypresses
+        curses.cbreak()  # React to keys instantly
+        stdscr.nodelay(1)  # Non-blocking input
+        
+        try:
+            yield stdscr
+        finally:
+            # Cleanup
+            curses.nocbreak()
+            curses.echo()
+            curses.endwin()
+    
+    try:
+        with setup_curses() as stdscr:
+            # Clear screen and show instructions
+            # stdscr.clear()
+            stdscr.addstr(0, 0, "Press SPACE to start recording, press SPACE again to stop...")
+            stdscr.addstr(1, 0, "Press Ctrl+C to cancel")
+            stdscr.refresh()
+            
+            # Setup audio stream
+            with sd.InputStream(samplerate=sample_rate,
+                              channels=1,
+                              callback=audio_callback):
+                while not done:
+                    try:
+                        # Check for spacebar press (ASCII 32)
+                        c = stdscr.getch()
+                        if c == ord(' '):
+                            if not recording:
+                                # Start recording
+                                recording = True
+                                stdscr.addstr(2, 0, "Recording... (Press SPACE to stop)")
+                                stdscr.clrtoeol()
+                            else:
+                                # Stop recording
+                                recording = False
+                                done = True
+                            stdscr.refresh()
+                        
+                        # Small sleep to prevent CPU hogging
+                        sd.sleep(10)
+                        
+                    except KeyboardInterrupt:
+                        done = True
+                        break
+        
+        # Combine all audio chunks
+        audio_chunks = []
+        while not audio_queue.empty():
+            audio_chunks.append(audio_queue.get())
+        
+        if not audio_chunks:
+            raise ValueError("No audio was recorded")
+            
+        audio_data = np.concatenate(audio_chunks)
+        audio_data = audio_data.flatten()
+        
+        logger.debug(f"Recorded {len(audio_data)/sample_rate:.2f}s of audio")
+        return audio_data, sample_rate
+        
+    except Exception as e:
+        logger.error(f"Error during interactive recording: {e}")
         raise
 
 def save_audio_file(audio_data: np.ndarray, output_path: str, sample_rate: int = DEFAULT_SAMPLE_RATE) -> str:
@@ -125,6 +223,7 @@ def resample_audio_if_needed(audio_data: np.ndarray,
 def get_audio_array(
     audio_file: Optional[str] = None,
     use_microphone: bool = False,
+    microphone_interactive: bool = False,
     microphone_duration: float = DEFAULT_MIC_DURATION,
     target_sample_rate: Optional[int] = None,
     audio_array: Optional[np.ndarray] = None,
@@ -165,6 +264,7 @@ def get_audio_array(
     elif use_microphone:
         return record_audio_from_microphone(
             duration=microphone_duration, 
+            interactive=microphone_interactive,
             sample_rate=target_sample_rate or DEFAULT_SAMPLE_RATE
         )
         

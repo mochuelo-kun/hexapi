@@ -22,6 +22,7 @@ DEFAULT_DECODING_METHOD = "greedy_search"
 DEFAULT_MIN_DURATION_ON = 0.3
 DEFAULT_MIN_DURATION_OFF = 0.5
 DEFAULT_CLUSTER_THRESHOLD = 0.5
+DEFAULT_NUM_SPEAKERS=-1 # Auto-detect number of speakers if -1
 
 class ModelFiles:
     """Helper class to find and manage model files"""
@@ -88,6 +89,7 @@ class SherpaLocalSTT(SpeechToTextBase):
                  enable_diarization: bool = False,
                  recognition_model: Optional[str] = None,
                  segmentation_model: Optional[str] = None,
+                 num_speakers: Optional[int] = None,
                  use_int8: bool = False,
                  **kwargs):
         """
@@ -98,6 +100,7 @@ class SherpaLocalSTT(SpeechToTextBase):
             enable_diarization: Whether to enable speaker diarization
             recognition_model: Optional custom recognition model name
             segmentation_model: Optional custom segmentation model name
+            num_speakers: Optional explicit indication of number of speakers
             use_int8: Whether to use int8 quantized models if available
             **kwargs: Additional parameters
         """
@@ -107,6 +110,7 @@ class SherpaLocalSTT(SpeechToTextBase):
         self.enable_diarization = enable_diarization
         self.recognition_model = recognition_model or DEFAULT_RECOGNITION_MODEL
         self.segmentation_model = segmentation_model or DEFAULT_SEGMENTATION_MODEL
+        self.num_speakers = num_speakers or DEFAULT_NUM_SPEAKERS
         self.use_int8 = use_int8
         
         try:
@@ -272,7 +276,7 @@ class SherpaLocalSTT(SpeechToTextBase):
                 model=str(embedding_model)
             ),
             clustering=sherpa_onnx.FastClusteringConfig(
-                num_clusters=-1,  # Auto-detect number of speakers
+                num_clusters=self.num_speakers,
                 threshold=DEFAULT_CLUSTER_THRESHOLD
             ),
             min_duration_on=DEFAULT_MIN_DURATION_ON,

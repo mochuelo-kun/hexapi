@@ -1,11 +1,7 @@
 import time
 import logging
-from typing import Optional, Union, Dict, Any, Tuple
+from typing import Optional, Union, Dict, Any
 import numpy as np
-from .base import SpeechToTextBase
-from .whisper_api import WhisperAPI
-from .whisper_local import WhisperLocal
-from .sherpa_local import SherpaLocalSTT
 from .. import audio_utils
 
 logger = logging.getLogger('chrysalis.speech_to_text.api')
@@ -20,6 +16,7 @@ class SpeechToTextAPI:
                 recognition_model: Optional[str] = None,
                 segmentation_model: Optional[str] = None,
                 use_int8: bool = False,
+                num_speakers: Optional[int] = None,
                 **kwargs):
         """Initialize the speech-to-text API
         
@@ -38,6 +35,7 @@ class SpeechToTextAPI:
         self.enable_diarization = enable_diarization
         self.recognition_model = recognition_model
         self.segmentation_model = segmentation_model
+        self.num_speakers = num_speakers
         self.use_int8 = use_int8
         self.kwargs = kwargs
         
@@ -49,6 +47,7 @@ class SpeechToTextAPI:
                 enable_diarization=enable_diarization,
                 recognition_model=recognition_model,
                 segmentation_model=segmentation_model,
+                num_speakers=num_speakers,
                 use_int8=use_int8,
                 **kwargs
             )
@@ -67,10 +66,12 @@ class SpeechToTextAPI:
     def transcribe(self,
                   audio_file: Optional[str] = None,
                   use_microphone: bool = False,
+                  microphone_interactive: bool = False,
                   microphone_duration: float = audio_utils.DEFAULT_MIC_DURATION,
                   audio_array: Optional[np.ndarray] = None,
                   sample_rate: Optional[int] = None,
-                  target_sample_rate: Optional[int] = None) -> Union[str, Dict[str, Any]]:
+                  target_sample_rate: Optional[int] = None,
+    ) -> Union[str, Dict[str, Any]]:
         """Transcribe audio to text
         
         This method accepts audio in various forms:
@@ -101,6 +102,7 @@ class SpeechToTextAPI:
             audio_data, audio_sample_rate = audio_utils.get_audio_array(
                 audio_file=audio_file,
                 use_microphone=use_microphone,
+                microphone_interactive=microphone_interactive,
                 microphone_duration=microphone_duration,
                 target_sample_rate=target_sample_rate,
                 audio_array=audio_array,
@@ -111,7 +113,10 @@ class SpeechToTextAPI:
             
             # Transcribe the audio data
             transcription_start = time.time()
-            result = self._backend.transcribe_array(audio_data, audio_sample_rate)
+            result = self._backend.transcribe_array(
+                audio_data=audio_data,
+                sample_rate=audio_sample_rate,
+            )
             transcription_time = time.time() - transcription_start
             
             # Log the result

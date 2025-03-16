@@ -33,6 +33,7 @@ class PipelineConfig:
     recognition_model: Optional[str] = None  # Speaker recognition model for diarization
     segmentation_model: Optional[str] = None  # Speaker segmentation model for diarization
     use_int8: bool = False  # Whether to use int8 quantized models
+    num_speakers: Optional[int] = None  # (For diarizatino) How many speakers if known
     
     # LLM configuration
     llm_implementation: str = "openai"  # "openai", "ollama", etc.
@@ -94,7 +95,8 @@ class Pipeline:
                 stt_params.update({
                     "enable_diarization": True,
                     "recognition_model": self.config.recognition_model,
-                    "segmentation_model": self.config.segmentation_model
+                    "segmentation_model": self.config.segmentation_model,
+                    "num_speakers": self.config.num_speakers,
                 })
                 
             # Additional parameters from kwargs

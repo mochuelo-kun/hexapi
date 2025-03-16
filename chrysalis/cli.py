@@ -5,6 +5,7 @@ from pathlib import Path
 from .pipeline import Pipeline, PipelineConfig
 from .config import Config
 from .logging import setup_logging
+from typing import Optional
 
 # Initialize logging at the module level
 logger = setup_logging(level=logging.DEBUG)
@@ -15,21 +16,37 @@ def cli():
     pass
 
 @cli.command()
-@click.argument('audio_input', type=click.Path(exists=True))
+@click.argument('audio-input-file', type=click.Path(exists=True), required=False)
+@click.option('--use-microphone', '-m', is_flag=True, help='Record audio from microphone')
+@click.option('--microphone-interactive', '-m', is_flag=True, help='Whether microphone is triggered on user input')
+@click.option('--microphone-duration', '-d', type=float, help='Recording microphone_duration in seconds')
 @click.option('--enable-diarization', is_flag=True, help='Enable speaker diarization')
 @click.option('--recognition-model', help='Speaker recognition model name (requires --enable-diarization)')
 @click.option('--segmentation-model', help='Speaker segmentation model name (requires --enable-diarization)')
+@click.option('--num-speakers', type=int, help='Number of speakers present (requires --enable-diarization)')
 @click.option('--use-int8', is_flag=True, help='Use int8 quantized models if available')
-@click.option('--output', '-o', type=click.Path(), help='Output file for transcription')
+@click.option('--output-file', '-o', type=click.Path(), help='Output file for transcription')
 @click.option('--format', '-f', type=click.Choice(['text', 'json']), default='text',
               help='Output format (text or json)')
-def transcribe(audio_input: str, enable_diarization: bool, recognition_model: str,
-               segmentation_model: str, use_int8: bool, output: str, format: str):
-    """Transcribe audio file to text with optional diarization
-    
-    Models should be placed in {ONNX_MODEL_DIR}/diarization/{recognition,segmentation}/
-    """
-    # Validate diarization options
+def transcribe(
+    audio_input_file: Optional[str],
+    use_microphone: bool,
+    microphone_interactive: bool,
+    microphone_duration: Optional[float],
+    enable_diarization: bool,
+    recognition_model: str,
+    segmentation_model: str,
+    num_speakers: int,
+    use_int8: bool,
+    output_file: str,
+    format: str,
+):
+    """Transcribe audio file or microphone input to text with optional diarization"""
+    # Input validation
+    if not audio_input_file and not use_microphone:
+        raise click.UsageError("Either provide an audio file or use --use-microphone")
+    if audio_input_file and use_microphone:
+        raise click.UsageError("Cannot use both audio file and microphone input")
     if (recognition_model or segmentation_model) and not enable_diarization:
         raise click.UsageError("--recognition-model and --segmentation-model require --enable-diarization")
     
@@ -38,42 +55,57 @@ def transcribe(audio_input: str, enable_diarization: bool, recognition_model: st
         enable_diarization=enable_diarization,
         recognition_model=recognition_model,
         segmentation_model=segmentation_model,
+        num_speakers=num_speakers,
         use_int8=use_int8
     )
     
     # Initialize pipeline with configuration
     pipeline = Pipeline(config=config)
     
-    result = pipeline.transcribe_to_text(audio_input)
-    
-    # Format output
-    if format == 'json':
-        if enable_diarization and isinstance(result, dict):
-            output_text = json.dumps(result, indent=2)
+    try:
+        # Process the audio
+        transcription = pipeline.stt.transcribe(
+            audio_file=audio_input_file,
+            use_microphone=use_microphone,
+            microphone_interactive=microphone_interactive,
+            microphone_duration=microphone_duration,
+        )
+        
+        # Format output
+        if format == 'json':
+            if enable_diarization and isinstance(transcription, dict):
+                output_text = json.dumps(transcription, indent=2)
+            else:
+                output_text = json.dumps({"text": transcription}, indent=2)
         else:
-            output_text = json.dumps({"text": result}, indent=2)
-    else:
-        if enable_diarization and isinstance(result, dict) and "segments" in result:
-            # Format diarized text nicely
-            lines = []
-            for segment in result["segments"]:
-                if isinstance(segment, dict):
-                    start = segment.get("start", 0)
-                    speaker = segment.get("speaker", "Unknown")
-                    text = segment.get("text", "")
-                    lines.append(f"[{start:.2f}s] (Speaker {speaker}) {text}")
-                else:
-                    lines.append(str(segment))
-            output_text = "\n".join(lines)
+            if enable_diarization and isinstance(transcription, dict) and "segments" in transcription:
+                # Format diarized text nicely
+                lines = []
+                for segment in transcription["segments"]:
+                    if isinstance(segment, dict):
+                        start = segment.get("start", 0)
+                        speaker = segment.get("speaker", "Unknown")
+                        text = segment.get("text", "")
+                        lines.append(f"[{start:.2f}s] (Speaker {speaker}) {text}")
+                    else:
+                        lines.append(str(segment))
+                output_text = "\n".join(lines)
+            else:
+                output_text = transcription
+                
+        # Write or print output
+        if output_file:
+            Path(output_file).write_text(output_text)
+            click.echo(f"Transcription saved to: {output_file}")
         else:
-            output_text = result
+            click.echo(output_text)
             
-    # Write or print output
-    if output:
-        Path(output).write_text(output_text)
-        click.echo(f"Transcription saved to: {output}")
-    else:
-        click.echo(output_text)
+    except KeyboardInterrupt:
+        click.echo("\nRecording cancelled.")
+        return
+    except Exception as e:
+        logger.error(f"Error during transcription: {e}")
+        raise click.ClickException(str(e))
 
 @cli.command()
 @click.argument('text')
@@ -125,7 +157,7 @@ def speak(text: str, output: str, tts_model: str, speaker_id: int, speed: float)
     click.echo(f"Audio saved to: {output}")
 
 @cli.command()
-@click.argument('audio_input', type=click.Path(exists=True))
+@click.argument('audio-input-file', type=click.Path(exists=True))
 @click.option('--enable-diarization', is_flag=True, help='Enable speaker diarization')
 @click.option('--recognition-model', help='Speaker recognition model name (requires --enable-diarization)')
 @click.option('--segmentation-model', help='Speaker segmentation model name (requires --enable-diarization)')
@@ -136,7 +168,7 @@ def speak(text: str, output: str, tts_model: str, speaker_id: int, speed: float)
 @click.option('--speed', type=float, default=1.0, help='TTS speech speed')
 @click.option('--format', '-f', type=click.Choice(['text', 'json']), default='text',
               help='Output format (text or json)')
-def pipeline(audio_input: str, enable_diarization: bool, recognition_model: str,
+def pipeline(audio_input_file: str, enable_diarization: bool, recognition_model: str,
             segmentation_model: str, use_int8: bool, system_prompt: str, 
             output_audio: str, speaker_id: int, speed: float, format: str):
     """Process audio through the full pipeline (STT -> LLM -> TTS)
@@ -162,7 +194,7 @@ def pipeline(audio_input: str, enable_diarization: bool, recognition_model: str,
     pipeline = Pipeline(config=config)
     
     result = pipeline.process_audio_query(
-        audio_input,
+        audio_input_file,
         system_prompt=system_prompt,
         output_audio=output_audio
     )
