@@ -1,9 +1,8 @@
 import logging
 import time
 import numpy as np
-import soundfile as sf
 from pathlib import Path
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Optional, List, Union, Any
 from .base import SpeechToTextBase
 from ..config import Config
 
@@ -89,7 +88,8 @@ class SherpaLocalSTT(SpeechToTextBase):
                  enable_diarization: bool = False,
                  recognition_model: Optional[str] = None,
                  segmentation_model: Optional[str] = None,
-                 use_int8: bool = False):
+                 use_int8: bool = False,
+                 **kwargs):
         """
         Initialize Sherpa-ONNX local STT with optional diarization
         
@@ -99,16 +99,17 @@ class SherpaLocalSTT(SpeechToTextBase):
             recognition_model: Optional custom recognition model name
             segmentation_model: Optional custom segmentation model name
             use_int8: Whether to use int8 quantized models if available
+            **kwargs: Additional parameters
         """
-        self.model_name = model_name
+        import sherpa_onnx
+        logger.info(f"model_name: {model_name}")
+        self.model_name = model_name or DEFAULT_STT_MODEL
         self.enable_diarization = enable_diarization
         self.recognition_model = recognition_model or DEFAULT_RECOGNITION_MODEL
         self.segmentation_model = segmentation_model or DEFAULT_SEGMENTATION_MODEL
         self.use_int8 = use_int8
         
         try:
-            import sherpa_onnx
-            
             # Initialize recognizer
             self.recognizer = self._init_recognizer()
             
@@ -131,7 +132,7 @@ class SherpaLocalSTT(SpeechToTextBase):
     def _init_recognizer(self):
         """Initialize the speech recognizer"""
         import sherpa_onnx
-        
+
         model_dir = Path(Config.ONNX_MODEL_DIR) / "stt" / self.model_name
         if not model_dir.exists():
             raise FileNotFoundError(f"Model directory not found: {model_dir}")
@@ -244,7 +245,7 @@ class SherpaLocalSTT(SpeechToTextBase):
     def _init_diarizer(self):
         """Initialize the speaker diarizer with custom models"""
         import sherpa_onnx
-        
+
         model_dir = Path(Config.ONNX_MODEL_DIR) / "diarization"
         
         # Find recognition model
@@ -280,333 +281,157 @@ class SherpaLocalSTT(SpeechToTextBase):
         
         return sherpa_onnx.OfflineSpeakerDiarization(config)
     
-    def transcribe_file(self, audio_file: str):
-        """Transcribe audio from a file with optional diarization"""
-        logger.debug("Transcribing file with Sherpa-ONNX: %s", audio_file)
-        start = time.time()
+    def transcribe_array(self, audio_data: np.ndarray, sample_rate: int) -> Union[str, Dict[str, Any]]:
+        """Transcribe audio data directly from numpy array with optional diarization
         
-        # Load audio
-        audio_waveform, sample_rate = sf.read(audio_file, dtype="float32", always_2d=True)
-        audio_waveform = audio_waveform[:, 0]  # only use the first channel
-        
-        # Get transcription
-        stream = self.recognizer.create_stream()
-        stream.accept_waveform(sample_rate, audio_waveform)
-        self.recognizer.decode_stream(stream)
-        text = stream.result.text.strip()
-        
-        # Handle diarization if enabled
-        if self.enable_diarization and self.diarizer:
-            # Process for diarization
-            logger.debug("Running speaker diarization")
-            speaker_segments = self.diarizer.process(audio_waveform).sort_by_start_time()
-            logger.debug("Found %d speaker segments", len(speaker_segments))
+        Args:
+            audio_data: Audio data as numpy array
+            sample_rate: Sample rate of the audio data
             
-            # Debug: Check what's available in the objects
-            result = stream.result
-            
-            # Now we can align tokens and timestamps with speaker segments
-            if hasattr(result, 'tokens') and hasattr(result, 'timestamps'):
-                tokens = result.tokens
-                timestamps = result.timestamps
-                
-                # Create a mapping of token index to speaker based on timestamp
-                token_to_speaker = {}
-                
-                # For each token, find which speaker segment it belongs to
-                for i, timestamp in enumerate(timestamps):
-                    if i >= len(tokens):
-                        break
-                        
-                    # Find the speaker segment that contains this timestamp
-                    assigned_speaker = None
-                    for segment in speaker_segments:
-                        if segment.start <= timestamp < segment.end:
-                            assigned_speaker = segment.speaker
-                            break
-                            
-                    # If no speaker found, use the closest one
-                    if assigned_speaker is None:
-                        min_distance = float('inf')
-                        for segment in speaker_segments:
-                            # Distance to segment start or end, whichever is closer
-                            distance = min(abs(timestamp - segment.start), abs(timestamp - segment.end))
-                            if distance < min_distance:
-                                min_distance = distance
-                                assigned_speaker = segment.speaker
-                    
-                    token_to_speaker[i] = assigned_speaker
-                
-                # Group consecutive tokens by speaker
-                segments = []
-                current_speaker = None
-                current_segment = None
-                
-                for i, token in enumerate(tokens):
-                    if i >= len(timestamps):
-                        break
-                        
-                    speaker = token_to_speaker.get(i)
-                    if speaker != current_speaker:
-                        # Start a new segment
-                        if current_segment:
-                            segments.append(current_segment)
-                        
-                        current_speaker = speaker
-                        current_segment = {
-                            "speaker": speaker,
-                            "start": timestamps[i],
-                            "tokens": [token],
-                            "token_indices": [i]
-                        }
-                    else:
-                        # Add to current segment
-                        current_segment["tokens"].append(token)
-                        current_segment["token_indices"].append(i)
-                
-                # Add the last segment
-                if current_segment:
-                    segments.append(current_segment)
-                
-                # For each segment, get the text and end time
-                diarized_text = {
-                    "text": text,
-                    "segments": []
-                }
-                
-                for segment in segments:
-                    # Get all tokens in this segment
-                    segment_text = "".join(segment["tokens"]).strip()
-                    
-                    # Get the end time from the last token in the segment
-                    last_token_idx = segment["token_indices"][-1]
-                    if last_token_idx + 1 < len(timestamps):
-                        segment["end"] = timestamps[last_token_idx + 1]
-                    else:
-                        # Use the speaker segment end time as fallback
-                        for spk_segment in speaker_segments:
-                            if spk_segment.speaker == segment["speaker"] and spk_segment.start <= segment["start"] < spk_segment.end:
-                                segment["end"] = spk_segment.end
-                                break
-                        else:
-                            # Last resort fallback
-                            segment["end"] = segment["start"] + 1.0
-                    
-                    # Add to result
-                    if segment_text:  # Only add non-empty segments
-                        diarized_text["segments"].append({
-                            "speaker": segment["speaker"],
-                            "start": segment["start"],
-                            "end": segment["end"],
-                            "text": segment_text
-                        })
-                
-                return diarized_text
-            else:
-                # Fallback to the previous approach
-                logger.debug("Tokens or timestamps not available, using sentence-based approach")
-                diarized_result = self._align_transcription_with_speakers_fallback(text, speaker_segments)
-                return diarized_result
+        Returns:
+            Transcription result (string or dict with diarization info)
+        """
+        start_time = time.time()
+        logger.debug(f"Transcribing audio array with sherpa-onnx: {len(audio_data)/sample_rate:.2f}s")
         
-        duration = time.time() - start
-        logger.debug("File transcription completed in %.2fs", duration)
-        return text
-    
-    def transcribe_audio(self, audio_data: np.ndarray, sample_rate: int) -> str:
-        """Transcribe audio from numpy array with optional diarization"""
-        logger.debug("Transcribing audio data with Sherpa-ONNX")
-        start = time.time()
+        # Ensure audio is mono and float32
+        if len(audio_data.shape) > 1:
+            audio_data = audio_data[:, 0]  # Take first channel if stereo
+        if audio_data.dtype != np.float32:
+            audio_data = audio_data.astype(np.float32)
         
         # Create stream and process audio
         stream = self.recognizer.create_stream()
-        stream.accept_waveform_from_numpy(audio_data, sample_rate)
-        
-        # Get transcription
+        stream.accept_waveform(sample_rate, audio_data)
         self.recognizer.decode_stream(stream)
         text = stream.result.text.strip()
         
         # Handle diarization if enabled
         if self.enable_diarization and self.diarizer:
-            segments = self.diarizer.diarize_numpy(audio_data, sample_rate)
-            text = self._format_diarized_text(text, segments)
+            logger.debug("Running speaker diarization")
+            speaker_segments = self.diarizer.process(audio_data).sort_by_start_time()
+            logger.debug("Found %d speaker segments", len(speaker_segments))
+            
+            # Check if we can do detailed token-based alignment
+            result = stream.result
+            if hasattr(result, 'tokens') and hasattr(result, 'timestamps'):
+                diarized_text = self._align_transcription_with_speakers(text, speaker_segments, result)
+            else:
+                # Fallback to simpler sentence-based approach
+                logger.debug("Tokens or timestamps not available, using sentence-based approach")
+                diarized_text = self._align_transcription_with_speakers_fallback(text, speaker_segments)
+            
+            duration = time.time() - start_time
+            logger.debug("Diarized transcription completed in %.2fs", duration)
+            return diarized_text
         
-        duration = time.time() - start
-        logger.debug("Audio data transcription completed in %.2fs", duration)
+        duration = time.time() - start_time
+        logger.debug("Transcription completed in %.2fs", duration)
         return text
-    
 
-    def _align_transcription_with_speakers(self, text, speaker_segments):
-        """Align transcription with speaker segments based on timestamps"""
-        # Initialize result structure
+    def _align_transcription_with_speakers(self, text: str, speaker_segments: Any, result: Any) -> Dict[str, Any]:
+        """Align transcription with speaker segments based on token timestamps
+        
+        Args:
+            text: Full transcription text
+            speaker_segments: Speaker diarization segments
+            result: Recognizer result object containing tokens and timestamps
+            
+        Returns:
+            Dict containing aligned text segments with speaker information
+        """
         diarized_text = {
             "text": text,
             "segments": []
         }
         
-        # Get the recognizer result object (need to be called right after decode_stream)
-        # This approach won't work for transcribe_audio since we don't have the result object
-        # Let's work with the tokens and timestamps arrays directly
+        tokens = result.tokens
+        timestamps = result.timestamps
         
-        # Check if we have the necessary attributes in the recognizer result
-        if hasattr(stream.result, 'tokens') and hasattr(stream.result, 'timestamps'):
-            tokens = stream.result.tokens
-            timestamps = stream.result.timestamps
+        # Create a mapping of token index to speaker based on timestamp
+        token_to_speaker = {}
+        
+        # For each token, find which speaker segment it belongs to
+        for i, timestamp in enumerate(timestamps):
+            if i >= len(tokens):
+                break
             
-            # Check if we have enough tokens and timestamps
-            if len(tokens) > 0 and len(timestamps) > 0:
-                logger.debug("Using token-based alignment with %d tokens and %d timestamps", 
-                            len(tokens), len(timestamps))
+            # Find the speaker segment that contains this timestamp
+            assigned_speaker = None
+            for segment in speaker_segments:
+                if segment.start <= timestamp < segment.end:
+                    assigned_speaker = segment.speaker
+                    break
                 
-                # Create a mapping of token index to speaker based on timestamp
-                token_to_speaker = {}
-                
-                # For each token, find which speaker segment it belongs to
-                for i, timestamp in enumerate(timestamps):
-                    if i >= len(tokens):
-                        break
-                        
-                    # Find the speaker segment that contains this timestamp
-                    assigned_speaker = None
-                    for segment in speaker_segments:
-                        if segment.start <= timestamp < segment.end:
-                            assigned_speaker = segment.speaker
-                            break
-                            
-                    # If no speaker found, use the closest one
-                    if assigned_speaker is None:
-                        min_distance = float('inf')
-                        for segment in speaker_segments:
-                            # Distance to segment start or end, whichever is closer
-                            distance = min(abs(timestamp - segment.start), abs(timestamp - segment.end))
-                            if distance < min_distance:
-                                min_distance = distance
-                                assigned_speaker = segment.speaker
-                    
-                    token_to_speaker[i] = assigned_speaker
-                
-                # Group consecutive tokens by speaker
-                segments = []
-                current_speaker = None
-                current_segment = None
-                
-                for i, token in enumerate(tokens):
-                    if i >= len(timestamps):
-                        break
-                        
-                    speaker = token_to_speaker.get(i)
-                    if speaker != current_speaker:
-                        # Start a new segment
-                        if current_segment:
-                            segments.append(current_segment)
-                        
-                        current_speaker = speaker
-                        current_segment = {
-                            "speaker": speaker,
-                            "start": timestamps[i],
-                            "tokens": [token],
-                            "token_indices": [i]
-                        }
-                    else:
-                        # Add to current segment
-                        current_segment["tokens"].append(token)
-                        current_segment["token_indices"].append(i)
-                
-                # Add the last segment
+            # If no speaker found, use the closest one
+            if assigned_speaker is None:
+                min_distance = float('inf')
+                for segment in speaker_segments:
+                    distance = min(abs(timestamp - segment.start), abs(timestamp - segment.end))
+                    if distance < min_distance:
+                        min_distance = distance
+                        assigned_speaker = segment.speaker
+        
+            token_to_speaker[i] = assigned_speaker
+        
+        # Group consecutive tokens by speaker
+        segments = []
+        current_speaker = None
+        current_segment = None
+        
+        for i, token in enumerate(tokens):
+            if i >= len(timestamps):
+                break
+            
+            speaker = token_to_speaker.get(i)
+            if speaker != current_speaker:
+                # Start a new segment
                 if current_segment:
                     segments.append(current_segment)
                 
-                # For each segment, get the text and end time
-                for segment in segments:
-                    # Get all tokens in this segment
-                    segment_text = "".join(segment["tokens"]).strip()
-                    
-                    # Get the end time from the last token in the segment
-                    last_token_idx = segment["token_indices"][-1]
-                    if last_token_idx + 1 < len(timestamps):
-                        segment["end"] = timestamps[last_token_idx + 1]
-                    else:
-                        # Use the speaker segment end time as fallback
-                        for spk_segment in speaker_segments:
-                            if spk_segment.speaker == segment["speaker"] and spk_segment.start <= segment["start"] < spk_segment.end:
-                                segment["end"] = spk_segment.end
-                                break
-                        else:
-                            # Last resort fallback
-                            segment["end"] = segment["start"] + 1.0
-                    
-                    # Add to result
-                    if segment_text:  # Only add non-empty segments
-                        diarized_text["segments"].append({
-                            "speaker": segment["speaker"],
-                            "start": segment["start"],
-                            "end": segment["end"],
-                            "text": segment_text
-                        })
-                
-                # If we managed to create segments, return them
-                if diarized_text["segments"]:
-                    return diarized_text
+                current_speaker = speaker
+                current_segment = {
+                    "speaker": speaker,
+                    "start": timestamps[i],
+                    "tokens": [token],
+                    "token_indices": [i]
+                }
+            else:
+                # Add to current segment
+                current_segment["tokens"].append(token)
+                current_segment["token_indices"].append(i)
         
-        # Fallback to simpler approach if the above didn't work
-        logger.debug("Falling back to simpler text-splitting approach")
+        # Add the last segment
+        if current_segment:
+            segments.append(current_segment)
         
-        # Split the text into sentences and assign to speakers
-        import re
-        sentences = re.split(r'(?<=[.!?])\s+', text)
-        
-        # Estimate total duration from the last segment's end time
-        total_duration = speaker_segments[-1].end if speaker_segments else 0
-        if not total_duration:
-            logger.warning("Could not determine audio duration from segments")
-            return {"text": text, "segments": [{"speaker": "Unknown", "start": 0, "end": 0, "text": text}]}
-        
-        # Calculate rough timestamp for each sentence based on character count
-        char_per_second = len(text) / total_duration if total_duration > 0 else 1
-        
-        # Create sentence segments with estimated timestamps
-        sentence_segments = []
-        current_pos = 0
-        current_time = 0
-        
-        for sentence in sentences:
-            if not sentence.strip():
-                continue
-                
-            sentence_len = len(sentence)
-            sentence_duration = sentence_len / char_per_second
+        # For each segment, get the text and end time
+        for segment in segments:
+            # Get all tokens in this segment
+            segment_text = "".join(segment["tokens"]).strip()
             
-            sentence_segments.append({
-                "text": sentence,
-                "start": current_time,
-                "end": current_time + sentence_duration
-            })
+            # Get the end time from the last token in the segment
+            last_token_idx = segment["token_indices"][-1]
+            if last_token_idx + 1 < len(timestamps):
+                segment["end"] = timestamps[last_token_idx + 1]
+            else:
+                # Use the speaker segment end time as fallback
+                for spk_segment in speaker_segments:
+                    if spk_segment.speaker == segment["speaker"] and spk_segment.start <= segment["start"] < spk_segment.end:
+                        segment["end"] = spk_segment.end
+                        break
+                else:
+                    # Last resort fallback
+                    segment["end"] = segment["start"] + 1.0
             
-            current_pos += sentence_len
-            current_time += sentence_duration
-        
-        # Now assign speakers to each sentence based on time overlap
-        for sentence in sentence_segments:
-            # Find which speaker segment has the most overlap with this sentence
-            max_overlap = 0
-            best_speaker = 0
-            
-            for segment in speaker_segments:
-                # Calculate overlap between sentence and speaker segment
-                overlap_start = max(sentence["start"], segment.start)
-                overlap_end = min(sentence["end"], segment.end)
-                overlap = max(0, overlap_end - overlap_start)
-                
-                if overlap > max_overlap:
-                    max_overlap = overlap
-                    best_speaker = segment.speaker
-            
-            # Add this sentence with its assigned speaker
-            diarized_text["segments"].append({
-                "speaker": best_speaker,
-                "start": sentence["start"],
-                "end": sentence["end"],
-                "text": sentence["text"]
-            })
+            # Add to result
+            if segment_text:  # Only add non-empty segments
+                diarized_text["segments"].append({
+                    "speaker": segment["speaker"],
+                    "start": segment["start"],
+                    "end": segment["end"],
+                    "text": segment_text
+                })
         
         return diarized_text
 
@@ -672,44 +497,3 @@ class SherpaLocalSTT(SpeechToTextBase):
             })
         
         return diarized_text
-
-    def _format_diarized_text(self, text, segments):
-        """Format text with speaker diarization information"""
-        if isinstance(segments, dict) and "segments" in segments:
-            # If segments is already a properly formatted result, return it
-            return segments
-            
-        if hasattr(segments, "segments"):
-            # If segments is a result object with segments attribute
-            segments = segments.segments
-        
-        diarized_result = {
-            "text": text,
-            "segments": []
-        }
-        
-        for segment in segments:
-            if hasattr(segment, "speaker") and hasattr(segment, "start") and hasattr(segment, "end"):
-                # Handle proper segment objects
-                segment_text = ""
-                if hasattr(segment, "text") and segment.text:
-                    segment_text = segment.text
-                
-                diarized_result["segments"].append({
-                    "speaker": segment.speaker,
-                    "start": segment.start,
-                    "end": segment.end,
-                    "text": segment_text if segment_text else f"[Segment from {segment.start:.2f}s to {segment.end:.2f}s]"
-                })
-        
-        # If we have no segments, add a default one
-        if not diarized_result["segments"]:
-            logger.warning("No speaker segments found in diarization results. Using full text.")
-            diarized_result["segments"].append({
-                "speaker": "Unknown",
-                "start": 0,
-                "end": 0,
-                "text": text
-            })
-        
-        return diarized_result

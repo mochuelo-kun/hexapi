@@ -4,11 +4,9 @@ from typing import Optional, Union, Dict, Any
 from dataclasses import dataclass
 import psutil
 import os
-from pathlib import Path
 from .speech_to_text.api import SpeechToTextAPI
 from .llm_query.api import LLMQueryAPI
 from .text_to_speech.api import TextToSpeechAPI
-from .logging import setup_logging
 
 logger = logging.getLogger('chrysalis.pipeline')
 
@@ -29,7 +27,7 @@ def log_memory_change(start_mem: float, operation: str):
 class PipelineConfig:
     """Configuration for the Chrysalis pipeline"""
     # Speech-to-text configuration
-    stt_implementation: str = "sherpa_local"  # "whisper_api", "sherpa_local", etc.
+    stt_implementation: str = "sherpa_local"  # "whisper_api", "whisper_local", "sherpa_local", etc.
     stt_model: Optional[str] = None  # Name of STT model if applicable 
     enable_diarization: bool = False  # Whether to enable speaker diarization
     recognition_model: Optional[str] = None  # Speaker recognition model for diarization
@@ -313,7 +311,7 @@ class Pipeline:
     
     def run(self,
             audio_file: Optional[str] = None,
-            use_mic: bool = False,
+            use_microphone: bool = False,
             output_file: str = "output.mp3",
             system_prompt: Optional[str] = None) -> dict:
         """
@@ -321,7 +319,7 @@ class Pipeline:
         
         Args:
             audio_file: Path to input audio file
-            use_mic: Whether to record from microphone
+            use_microphone: Whether to record from microphone
             output_file: Path to save output audio file
             system_prompt: Optional system prompt for LLM
             
@@ -339,7 +337,7 @@ class Pipeline:
         stt_start_mem = get_memory_usage()
         transcription = self.stt.transcribe(
             audio_file=audio_file,
-            use_mic=use_mic
+            use_microphone=use_microphone
         )
         timings["stt"] = time.time() - stt_start
         memory_changes["stt"] = get_memory_usage() - stt_start_mem
@@ -394,13 +392,16 @@ class Pipeline:
     
     def transcribe_only(self,
                        audio_file: Optional[str] = None,
-                       use_mic: bool = False) -> str:
+                       use_microphone: bool = False) -> str:
         """Run only the speech-to-text component"""
         start_time = time.time()
         start_mem = get_memory_usage()
         logger.info("Running transcribe_only")
         
-        result = self.stt.transcribe(audio_file=audio_file, use_mic=use_mic)
+        result = self.stt.transcribe(
+            audio_file=audio_file, 
+            use_microphone=use_microphone
+        )
         
         logger.info("Transcribe_only completed in %.3fs", time.time() - start_time)
         log_memory_change(start_mem, "transcribe_only")
