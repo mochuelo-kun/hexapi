@@ -9,9 +9,9 @@ from ..config import Config
 logger = logging.getLogger('chrysalis.stt.sherpa_local')
 
 # Default model selections
-DEFAULT_STT_MODEL = "sherpa-onnx-zipformer-en-2023-06-26"
-DEFAULT_RECOGNITION_MODEL = "wespeaker_en_voxceleb_CAM++"
-DEFAULT_SEGMENTATION_MODEL = "sherpa-onnx-pyannote-segmentation-3-0"
+DEFAULT_STT_MODEL = "sherpa-onnx-whisper-large-v3"
+DEFAULT_RECOGNITION_MODEL = "nemo_en_titanet_large"
+DEFAULT_SEGMENTATION_MODEL = "sherpa-onnx-reverb-diarization-v2"
 
 # Model configuration
 DEFAULT_SAMPLE_RATE = 16000
@@ -19,10 +19,10 @@ DEFAULT_NUM_MEL_BINS = 80
 DEFAULT_DECODING_METHOD = "greedy_search"
 
 # Diarization configuration
-DEFAULT_MIN_DURATION_ON = 0.3
-DEFAULT_MIN_DURATION_OFF = 0.5
-DEFAULT_CLUSTER_THRESHOLD = 0.5
-DEFAULT_NUM_SPEAKERS=-1 # Auto-detect number of speakers if -1
+DEFAULT_MIN_DURATION_ON = 0.5  # Increased to reduce false positives
+DEFAULT_MIN_DURATION_OFF = 0.7  # Increased to better handle pauses
+DEFAULT_CLUSTER_THRESHOLD = 0.6  # Increased for more confident speaker clustering
+DEFAULT_NUM_SPEAKERS = -1  # Auto-detect number of speakers if -1
 
 class ModelFiles:
     """Helper class to find and manage model files"""
@@ -55,10 +55,20 @@ class ModelFiles:
     
     def find_encoder(self) -> Optional[Path]:
         """Find encoder model file"""
+        # Try Whisper-style naming first (e.g., large-v3-encoder)
+        whisper_matches = [f for f in self.files if f.stem.endswith("-encoder")]
+        if whisper_matches:
+            return whisper_matches[0]
+        # Fall back to generic patterns
         return self._find_file(["encoder", "encode"])
         
     def find_decoder(self) -> Optional[Path]:
         """Find decoder model file"""
+        # Try Whisper-style naming first (e.g., large-v3-decoder)
+        whisper_matches = [f for f in self.files if f.stem.endswith("-decoder")]
+        if whisper_matches:
+            return whisper_matches[0]
+        # Fall back to generic patterns
         return self._find_file(["decoder", "decode"])
         
     def find_joiner(self) -> Optional[Path]:
@@ -67,6 +77,11 @@ class ModelFiles:
         
     def find_single_model(self) -> Optional[Path]:
         """Find single model file"""
+        # Try Whisper-style naming first (e.g., large-v3)
+        whisper_matches = [f for f in self.files if f.stem.endswith("-v3") or f.stem.endswith("-v2")]
+        if whisper_matches:
+            return whisper_matches[0]
+        # Fall back to generic pattern
         return self._find_file(["model"])
         
     def find_tokens(self) -> Path:
@@ -76,7 +91,7 @@ class ModelFiles:
         if tokens_file.exists():
             return tokens_file
             
-        # Check for model-specific tokens file
+        # Check for model-specific tokens file (e.g., large-v3-tokens.txt)
         model_tokens = list(self.model_dir.glob("*tokens.txt"))
         if model_tokens:
             return model_tokens[0]
@@ -303,7 +318,23 @@ class SherpaLocalSTT(SpeechToTextBase):
             audio_data = audio_data[:, 0]  # Take first channel if stereo
         if audio_data.dtype != np.float32:
             audio_data = audio_data.astype(np.float32)
-        
+                    
+        # Normalize audio to [-1, 1] range
+        if audio_data.max() > 1.0 or audio_data.min() < -1.0:
+            audio_data = np.clip(audio_data, -1.0, 1.0)
+            
+        # Apply noise reduction using a simple moving average filter
+        window_size = int(0.02 * sample_rate)  # 20ms window
+        if window_size > 1:
+            audio_data = np.convolve(audio_data, np.ones(window_size)/window_size, mode='same')
+            
+        # Apply a simple high-pass filter to remove low-frequency noise
+        from scipy import signal
+        nyquist = sample_rate / 2
+        cutoff = 100 / nyquist  # 100Hz cutoff
+        b, a = signal.butter(4, cutoff, btype='high')
+        audio_data = signal.filtfilt(b, a, audio_data)
+
         # Create stream and process audio
         stream = self.recognizer.create_stream()
         stream.accept_waveform(sample_rate, audio_data)
@@ -354,6 +385,7 @@ class SherpaLocalSTT(SpeechToTextBase):
         
         # Create a mapping of token index to speaker based on timestamp
         token_to_speaker = {}
+        token_confidence = {}
         
         # For each token, find which speaker segment it belongs to
         for i, timestamp in enumerate(timestamps):
@@ -362,12 +394,21 @@ class SherpaLocalSTT(SpeechToTextBase):
             
             # Find the speaker segment that contains this timestamp
             assigned_speaker = None
+            max_overlap = 0
+            confidence = 0.0
             for segment in speaker_segments:
                 if segment.start <= timestamp < segment.end:
-                    assigned_speaker = segment.speaker
-                    break
+                    # Calculate overlap with this segment
+                    overlap_start = max(timestamp, segment.start)
+                    overlap_end = min(timestamp + 0.1, segment.end)  # Assume 100ms token duration
+                    overlap = max(0, overlap_end - overlap_start)
                 
-            # If no speaker found, use the closest one
+                if overlap > max_overlap:
+                    max_overlap = overlap
+                    assigned_speaker = segment.speaker
+                    confidence = overlap / 0.1  # Normalize confidence by token duration
+                
+            # If no speaker found, use the closest one with reduced confidence
             if assigned_speaker is None:
                 min_distance = float('inf')
                 for segment in speaker_segments:
@@ -375,10 +416,12 @@ class SherpaLocalSTT(SpeechToTextBase):
                     if distance < min_distance:
                         min_distance = distance
                         assigned_speaker = segment.speaker
+                        confidence = 1.0 / (1.0 + distance)  # Inverse distance as confidence
         
             token_to_speaker[i] = assigned_speaker
+            token_confidence[i] = confidence
         
-        # Group consecutive tokens by speaker
+        # Group consecutive tokens by speaker with confidence scores
         segments = []
         current_speaker = None
         current_segment = None
@@ -388,6 +431,8 @@ class SherpaLocalSTT(SpeechToTextBase):
                 break
             
             speaker = token_to_speaker.get(i)
+            confidence = token_confidence.get(i, 0.0)
+            
             if speaker != current_speaker:
                 # Start a new segment
                 if current_segment:
@@ -398,12 +443,14 @@ class SherpaLocalSTT(SpeechToTextBase):
                     "speaker": speaker,
                     "start": timestamps[i],
                     "tokens": [token],
-                    "token_indices": [i]
+                    "token_indices": [i],
+                    "confidences": [confidence]
                 }
             else:
                 # Add to current segment
                 current_segment["tokens"].append(token)
                 current_segment["token_indices"].append(i)
+                current_segment["confidences"].append(confidence)
         
         # Add the last segment
         if current_segment:
@@ -413,6 +460,9 @@ class SherpaLocalSTT(SpeechToTextBase):
         for segment in segments:
             # Get all tokens in this segment
             segment_text = "".join(segment["tokens"]).strip()
+            
+            # Calculate average confidence for this segment
+            avg_confidence = sum(segment["confidences"]) / len(segment["confidences"])
             
             # Get the end time from the last token in the segment
             last_token_idx = segment["token_indices"][-1]
@@ -428,13 +478,14 @@ class SherpaLocalSTT(SpeechToTextBase):
                     # Last resort fallback
                     segment["end"] = segment["start"] + 1.0
             
-            # Add to result
+            # Add to result with confidence score
             if segment_text:  # Only add non-empty segments
                 diarized_text["segments"].append({
                     "speaker": segment["speaker"],
                     "start": segment["start"],
                     "end": segment["end"],
-                    "text": segment_text
+                    "text": segment_text,
+                    "confidence": avg_confidence
                 })
         
         return diarized_text
