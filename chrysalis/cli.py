@@ -145,7 +145,6 @@ def query(text: str, model: str, system_prompt: str, format: str):
 def speak(text: str, output: str, tts_model: str, speaker_id: int, speed: float):
     """Synthesize text to speech"""
     config = PipelineConfig(
-        tts_implementation="sherpa_local",
         tts_model=tts_model,
         speaker_id=speaker_id,
         speed=speed
@@ -181,7 +180,7 @@ def pipeline(audio_input_file: str, enable_diarization: bool, recognition_model:
     
     # Initialize pipeline config
     config = PipelineConfig(
-        stt_implementation="sherpa_local",
+        # stt_implementation=DEFAULT_STT_IMPLEMENTATION,
         enable_diarization=enable_diarization,
         recognition_model=recognition_model,
         segmentation_model=segmentation_model,

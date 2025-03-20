@@ -9,6 +9,7 @@ class Config:
     
     # Whisper Local
     WHISPER_MODEL = os.getenv("WHISPER_MODEL")
+    HUGGING_FACE_TOKEN = os.getenv("HUGGING_FACE_TOKEN")
     
     # ONNX Models (Piper, Sherpa)
     ONNX_MODEL_DIR = os.getenv("ONNX_MODEL_DIR")

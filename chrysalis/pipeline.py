@@ -8,6 +8,10 @@ from .speech_to_text.api import SpeechToTextAPI
 from .llm_query.api import LLMQueryAPI
 from .text_to_speech.api import TextToSpeechAPI
 
+DEFAULT_STT_IMPLEMENTATION="whisper_local"
+DEFAULT_LLM_IMPLEMENTATION="openai"
+DEFAULT_TTS_IMPLEMENTATION="sherpa_local"
+
 logger = logging.getLogger('chrysalis.pipeline')
 
 def get_memory_usage():
@@ -27,7 +31,7 @@ def log_memory_change(start_mem: float, operation: str):
 class PipelineConfig:
     """Configuration for the Chrysalis pipeline"""
     # Speech-to-text configuration
-    stt_implementation: str = "sherpa_local"  # "whisper_api", "whisper_local", "sherpa_local", etc.
+    stt_implementation: str = DEFAULT_STT_IMPLEMENTATION  # "whisper_api", "whisper_local", "sherpa_local", etc.
     stt_model: Optional[str] = None  # Name of STT model if applicable 
     enable_diarization: bool = False  # Whether to enable speaker diarization
     recognition_model: Optional[str] = None  # Speaker recognition model for diarization
@@ -36,11 +40,11 @@ class PipelineConfig:
     num_speakers: Optional[int] = None  # (For diarizatino) How many speakers if known
     
     # LLM configuration
-    llm_implementation: str = "openai"  # "openai", "ollama", etc.
-    llm_model: str = "gpt-3.5-turbo"  # Model identifier
+    llm_implementation: str = DEFAULT_LLM_IMPLEMENTATION  # "openai", "ollama", etc.
+    llm_model: Optional[str] = None  # Model identifier
     
     # TTS configuration
-    tts_implementation: str = "sherpa_local"  # "elevenlabs", "sherpa_local", etc.
+    tts_implementation: str = DEFAULT_STT_IMPLEMENTATION  # "elevenlabs", "sherpa_local", etc.
     tts_model: Optional[str] = None  # Name of TTS model if applicable
     speaker_id: int = 0  # Speaker ID for multi-speaker TTS models
     speed: float = 1.0  # Speech speed factor

@@ -56,7 +56,11 @@ class SpeechToTextAPI:
             self._backend = WhisperAPI(model_name=model_name, **kwargs)
         elif implementation == "whisper_local":
             from .whisper_local import WhisperLocal
-            self._backend = WhisperLocal(model_name=model_name, **kwargs)
+            self._backend = WhisperLocal(
+                model_name=model_name,
+                enable_diarization=self.enable_diarization,
+                **kwargs
+            )
         else:
             raise ValueError(f"Unknown STT implementation: {implementation}")
         
@@ -97,26 +101,35 @@ class SpeechToTextAPI:
         logger.debug("Starting audio transcription")
         
         try:
-            # Get audio data from any of the available sources
-            audio_loading_start = time.time()
-            audio_data, audio_sample_rate = audio_utils.get_audio_array(
-                audio_file=audio_file,
-                use_microphone=use_microphone,
-                microphone_interactive=microphone_interactive,
-                microphone_duration=microphone_duration,
-                target_sample_rate=target_sample_rate,
-                audio_array=audio_array,
-                array_sample_rate=sample_rate
-            )
-            audio_loading_time = time.time() - audio_loading_start
-            logger.debug(f"Audio obtained in {audio_loading_time:.3f}s: {len(audio_data)/audio_sample_rate:.2f}s at {audio_sample_rate}Hz")
-            
-            # Transcribe the audio data
+            result = None
             transcription_start = time.time()
-            result = self._backend.transcribe_array(
-                audio_data=audio_data,
-                sample_rate=audio_sample_rate,
-            )
+            audio_loading_time = 0
+            if audio_file:
+                result = self._backend.transcribe_file(
+                    audio_file=audio_file,
+                )
+            else:
+                # Get audio data from any of the available sources
+                audio_loading_start = time.time()
+                audio_data, audio_sample_rate = audio_utils.get_audio_array(
+                    audio_file=audio_file,
+                    use_microphone=use_microphone,
+                    microphone_interactive=microphone_interactive,
+                    microphone_duration=microphone_duration,
+                    target_sample_rate=target_sample_rate,
+                    audio_array=audio_array,
+                    array_sample_rate=sample_rate
+                )
+                audio_loading_time = time.time() - audio_loading_start
+                logger.debug(f"Audio obtained in {audio_loading_time:.3f}s: {len(audio_data)/audio_sample_rate:.2f}s at {audio_sample_rate}Hz")
+            
+                # Transcribe the audio data
+                transcription_start = time.time()
+                result = self._backend.transcribe_array(
+                    audio_data=audio_data,
+                    sample_rate=audio_sample_rate,
+                )
+            
             transcription_time = time.time() - transcription_start
             
             # Log the result
