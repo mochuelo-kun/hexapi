@@ -138,12 +138,13 @@ def query(text: str, model: str, system_prompt: str, format: str):
 
 @cli.command()
 @click.argument('text')
-@click.option('--output', '-o', type=click.Path(), required=True, help='Output audio file')
+@click.option('--output', '-o', type=click.Path(), help='Output audio file (if not specified, plays through speakers)')
 @click.option('--tts-model', '-m', help='TTS model to use')
 @click.option('--speaker-id', type=int, default=0, help='Speaker ID for multi-speaker models')
 @click.option('--speed', type=float, default=1.0, help='Speech speed factor')
-def speak(text: str, output: str, tts_model: str, speaker_id: int, speed: float):
-    """Synthesize text to speech"""
+@click.option('--no-play', is_flag=True, help='Disable audio playback when no output file specified')
+def speak(text: str, output: str, tts_model: str, speaker_id: int, speed: float, no_play: bool):
+    """Synthesize text to speech and optionally save to file or play through speakers"""
     config = PipelineConfig(
         tts_model=tts_model,
         speaker_id=speaker_id,
@@ -152,8 +153,16 @@ def speak(text: str, output: str, tts_model: str, speaker_id: int, speed: float)
     
     pipeline = Pipeline(config=config)
     
-    pipeline.synthesize_only(text, output)
-    click.echo(f"Audio saved to: {output}")
+    pipeline.synthesize_only(
+        text, 
+        output_file=output,
+        play_audio=not no_play
+    )
+    
+    if output:
+        click.echo(f"Audio saved to: {output}")
+    elif not no_play:
+        click.echo("Playing audio through speakers...")
 
 @cli.command()
 @click.argument('audio-input-file', type=click.Path(exists=True))

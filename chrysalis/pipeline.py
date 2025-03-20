@@ -430,9 +430,18 @@ class Pipeline:
     
     def synthesize_only(self,
                        text: str,
-                       output_file: str = "output.mp3",
+                       output_file: Optional[str] = None,
+                       play_audio: bool = True,
                        **kwargs) -> None:
-        """Run only the text-to-speech component"""
+        """Run only the text-to-speech component
+        
+        Args:
+            text: Text to synthesize
+            output_file: Optional path to save audio file. If None and play_audio is True,
+                        audio will be played through speakers
+            play_audio: Whether to play audio through speakers if no output file specified
+            **kwargs: Additional parameters for TTS
+        """
         start_time = time.time()
         start_mem = get_memory_usage()
         logger.info("Running synthesize_only")
@@ -444,16 +453,25 @@ class Pipeline:
         }
         tts_kwargs.update(kwargs)
         
+        # Generate audio
         audio_data, sample_rate = self.tts.synthesize(
             text=text,
-            output_file=output_file,
+            output_file=None,  # Always get audio data back
             **tts_kwargs
         )
-        audio_utils.save_audio_file(
-            audio_data=audio_data,
-            output_path=output_file,
-            sample_rate=sample_rate
-        )
+        
+        # Save to file if specified
+        if output_file:
+            audio_utils.save_audio_file(
+                audio_data=audio_data,
+                output_path=output_file,
+                sample_rate=sample_rate
+            )
+            logger.info("Audio saved to: %s", output_file)
+        # Play through speakers if enabled and no output file
+        elif play_audio:
+            logger.info("Playing audio through speakers")
+            audio_utils.play_audio(audio_data, sample_rate)
     
         logger.info("Synthesize_only completed in %.3fs", time.time() - start_time)
         log_memory_change(start_mem, "synthesize_only")

@@ -12,7 +12,7 @@ DEFAULT_TTS_MODEL = "en_US-amy-medium"
 DEFAULT_SAMPLE_RATE = 22050
 
 # Default synthesis parameters
-DEFAULT_SPEAKER_ID = 0
+# DEFAULT_SPEAKER_ID = 0
 DEFAULT_SPEED = 1.0
 
 class SherpaLocalTTS(TextToSpeechBase):
@@ -70,7 +70,6 @@ class SherpaLocalTTS(TextToSpeechBase):
             tts_config = sherpa_onnx.OfflineTtsConfig()
             tts_config.model.vits.model = str(model_path)
             tts_config.model.vits.tokens = str(tokens_path)
-            # tts_config.model.vits.data_dir = str(model_dir)
             tts_config.model.vits.data_dir = Config.ESPEAK_DATA_PATH
             # tts_config.model.num_threads = 1
             tts_config.model.debug = True
@@ -104,13 +103,13 @@ class SherpaLocalTTS(TextToSpeechBase):
         start_time = time.time()
         
         # Get optional parameters
-        speaker_id = kwargs.get("speaker_id", DEFAULT_SPEAKER_ID)
+        # speaker_id = kwargs.get("speaker_id", DEFAULT_SPEAKER_ID)
         speed = kwargs.get("speed", DEFAULT_SPEED)
         
         # Generate audio
         audio_data = self.synthesizer.generate(
             text=text,
-            speaker=speaker_id,
+            # speaker=speaker_id,
             speed=speed
         )
         

@@ -298,4 +298,20 @@ def audio_array_to_file(
         with tempfile.NamedTemporaryFile(suffix=f".{file_format}", delete=False) as temp_file:
             output_path = temp_file.name
     
-    return save_audio_file(audio_data, output_path, sample_rate=sample_rate) 
+    return save_audio_file(audio_data, output_path, sample_rate=sample_rate)
+
+def play_audio(audio_data: np.ndarray, sample_rate: int = DEFAULT_SAMPLE_RATE) -> None:
+    """Play audio data through system speakers
+    
+    Args:
+        audio_data: Audio data as numpy array
+        sample_rate: Sample rate of the audio data in Hz
+    """
+    logger.debug(f"Playing audio: {len(audio_data)/sample_rate:.2f}s at {sample_rate}Hz")
+    try:
+        sd.play(audio_data, sample_rate)
+        sd.wait()  # Wait until playback is finished
+        logger.debug("Audio playback completed")
+    except Exception as e:
+        logger.error(f"Error playing audio: {e}")
+        raise 
