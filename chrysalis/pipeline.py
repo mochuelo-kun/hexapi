@@ -7,6 +7,7 @@ import os
 from .speech_to_text.api import SpeechToTextAPI
 from .llm_query.api import LLMQueryAPI
 from .text_to_speech.api import TextToSpeechAPI
+from . import audio_utils
 
 DEFAULT_STT_IMPLEMENTATION="whisper_local"
 DEFAULT_LLM_IMPLEMENTATION="openai"
@@ -44,7 +45,7 @@ class PipelineConfig:
     llm_model: Optional[str] = None  # Model identifier
     
     # TTS configuration
-    tts_implementation: str = DEFAULT_STT_IMPLEMENTATION  # "elevenlabs", "sherpa_local", etc.
+    tts_implementation: str = DEFAULT_TTS_IMPLEMENTATION  # "elevenlabs", "sherpa_local", etc.
     tts_model: Optional[str] = None  # Name of TTS model if applicable
     speaker_id: int = 0  # Speaker ID for multi-speaker TTS models
     speed: float = 1.0  # Speech speed factor
@@ -443,12 +444,17 @@ class Pipeline:
         }
         tts_kwargs.update(kwargs)
         
-        self.tts.synthesize(
+        audio_data, sample_rate = self.tts.synthesize(
             text=text,
             output_file=output_file,
             **tts_kwargs
         )
-        
+        audio_utils.save_audio_file(
+            audio_data=audio_data,
+            output_path=output_file,
+            sample_rate=sample_rate
+        )
+    
         logger.info("Synthesize_only completed in %.3fs", time.time() - start_time)
         log_memory_change(start_mem, "synthesize_only")
     

@@ -1,12 +1,10 @@
 import logging
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Tuple
 import numpy as np
-from .. import audio_utils
-from .base import TextToSpeechBase
-from .elevenlabs import ElevenLabsTTS
-from .piper_local import PiperLocalTTS
-from .bark import BarkTTS
-from .sherpa_local import SherpaLocalTTS
+# from .elevenlabs import ElevenLabsTTS
+# from .piper_local import PiperLocalTTS
+# from .bark import BarkTTS
+# from .sherpa_local import SherpaLocalTTS
 
 logger = logging.getLogger('chrysalis.text_to_speech.api')
 
@@ -54,7 +52,7 @@ class TextToSpeechAPI:
             
         logger.info(f"Initialized {implementation} text-to-speech engine")
     
-    def synthesize_to_array(self, text: str, **kwargs) -> Tuple[np.ndarray, int]:
+    def synthesize(self, text: str, **kwargs) -> Tuple[np.ndarray, int]:
         """Synthesize text to audio array
         
         Args:
@@ -74,21 +72,5 @@ class TextToSpeechAPI:
         }
         params.update(kwargs)
         
-        return self._backend.synthesize_to_array(text, **params)
+        return self._backend.synthesize(text, **params)
     
-    def synthesize(self, text: str, output_file: str, **kwargs) -> str:
-        """Synthesize text to audio file
-        
-        Args:
-            text: Text to synthesize
-            output_file: Path to save output audio file
-            **kwargs: Additional parameters for synthesis
-            
-        Returns:
-            Path to the output audio file
-        """
-        # Get audio data array
-        audio_data, sample_rate = self.synthesize_to_array(text, **kwargs)
-        
-        # Save to file
-        return audio_utils.save_audio_file(audio_data, output_file, sample_rate=sample_rate) 

@@ -1,8 +1,7 @@
 import logging
 import time
-import numpy as np
-import soundfile as sf
 from pathlib import Path
+from typing import Optional
 from .base import TextToSpeechBase
 from ..config import Config
 
@@ -18,8 +17,8 @@ DEFAULT_SPEED = 1.0
 
 class SherpaLocalTTS(TextToSpeechBase):
     def __init__(self, 
-                 tts_model: str = DEFAULT_TTS_MODEL,
-                 sample_rate: int = DEFAULT_SAMPLE_RATE,
+                 tts_model: Optional[str] = None,
+                 sample_rate: Optional[int] = None,
                  **kwargs):
         """
         Initialize Sherpa-ONNX TTS
@@ -28,25 +27,25 @@ class SherpaLocalTTS(TextToSpeechBase):
             tts_model: Name of the model to use
             sample_rate: Output audio sample rate
         """
-        self.model_name = tts_model
-        self.sample_rate = sample_rate
+        self.model_name = tts_model or DEFAULT_TTS_MODEL
+        self.sample_rate = sample_rate or DEFAULT_SAMPLE_RATE
         
         try:
             import sherpa_onnx
             
             model_dir = Path(Config.ONNX_MODEL_DIR) / "tts"
-            model_path = model_dir / f"{tts_model}.onnx"
+            model_path = model_dir / f"{self.model_name}.onnx"
 
             # Look for tokens file - might be named {model}.tokens.txt or just tokens.txt
-            tokens_path = model_dir / f"{tts_model}.tokens.txt"
+            tokens_path = model_dir / f"{self.model_name}.tokens.txt"
 
             if not tokens_path.exists():
                 # Try original config file
-                tokens_path = model_dir / f"{tts_model}.json"
+                tokens_path = model_dir / f"{self.model_name}.json"
                 
                 # If that doesn't exist, try .onnx.json (Piper format)
                 if not tokens_path.exists():
-                    tokens_path = model_dir / f"{tts_model}.onnx.json"
+                    tokens_path = model_dir / f"{self.model_name}.onnx.json"
             
             if not model_path.exists():
                 available_models = [p.stem for p in model_dir.glob("*.onnx")]
@@ -57,11 +56,11 @@ class SherpaLocalTTS(TextToSpeechBase):
                 
             if not tokens_path.exists():
                 raise FileNotFoundError(
-                    f"Tokens file not found for model {tts_model}. "
-                    f"Expected one of: {tts_model}.tokens.txt, {tts_model}.json, or {tts_model}.onnx.json"
+                    f"Tokens file not found for model {self.model_name}. "
+                    f"Expected one of: {self.model_name}.tokens.txt, {self.model_name}.json, or {self.model_name}.onnx.json"
                 )
             
-            logger.info("Loading Sherpa-ONNX TTS model: %s", tts_model)
+            logger.info("Loading Sherpa-ONNX TTS model: %s", self.model_name)
             logger.info("  Model: %s", model_path)
             logger.info("  Tokens: %s", tokens_path)
             
@@ -88,13 +87,13 @@ class SherpaLocalTTS(TextToSpeechBase):
                 "Please check the README for installation instructions."
             )
     
+    # def synthesize(self, text: str, output_file: str, **kwargs) -> None:
     def synthesize(self, text: str, output_file: str, **kwargs) -> None:
         """
-        Synthesize text to speech and save to file
+        Synthesize text to speech
         
         Args:
             text: Input text
-            output_file: Path to save audio file
             **kwargs: Additional parameters including:
                 speaker_id: Speaker identity to use (if model supports it)
                 speed: Speech speed factor (default: 1.0)
@@ -111,16 +110,8 @@ class SherpaLocalTTS(TextToSpeechBase):
         # Generate audio
         audio_data = self.synthesizer.generate(
             text=text,
-            # speaker=speaker_id,
+            speaker=speaker_id,
             speed=speed
-        )
-        
-        # Save to file
-        sf.write(
-            output_file,
-            audio_data.samples,
-            samplerate=audio_data.sample_rate,
-            # subtype="PCM_16",
         )
         
         # Calculate metrics
@@ -130,3 +121,4 @@ class SherpaLocalTTS(TextToSpeechBase):
             "Synthesis completed in %.2fs (audio length: %.2fs, %.1fx realtime)", 
             duration, audio_duration, audio_duration/duration
         )
+        return audio_data.samples, audio_data.sample_rate
