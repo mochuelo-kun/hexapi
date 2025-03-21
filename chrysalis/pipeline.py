@@ -10,7 +10,8 @@ from .text_to_speech.api import TextToSpeechAPI
 from . import audio_utils
 
 DEFAULT_STT_IMPLEMENTATION="whisper_local"
-DEFAULT_LLM_IMPLEMENTATION="openai"
+DEFAULT_LLM_IMPLEMENTATION="ollama"
+DEFAULT_LLM_MODEL="qwen2.5:1.5b"
 DEFAULT_TTS_IMPLEMENTATION="sherpa_local"
 
 logger = logging.getLogger('chrysalis.pipeline')
@@ -41,8 +42,8 @@ class PipelineConfig:
     num_speakers: Optional[int] = None  # (For diarizatino) How many speakers if known
     
     # LLM configuration
-    llm_implementation: str = DEFAULT_LLM_IMPLEMENTATION  # "openai", "ollama", etc.
-    llm_model: Optional[str] = None  # Model identifier
+    llm_implementation: str = DEFAULT_LLM_IMPLEMENTATION  # "ollama", "openai", etc.
+    llm_model: str = DEFAULT_LLM_MODEL  # Name of the LLM model to use
     
     # TTS configuration
     tts_implementation: str = DEFAULT_TTS_IMPLEMENTATION  # "elevenlabs", "sherpa_local", etc.
@@ -128,20 +129,19 @@ class Pipeline:
         if self._llm is None:
             init_start = time.time()
             start_mem = get_memory_usage()
-            logger.info("Initializing LLM engine: %s", self.config.llm_implementation)
+            logger.info("Initializing LLM engine: %s with model: %s", 
+                       self.config.llm_implementation, self.config.llm_model)
             
             llm_params = {
-                "model": self.config.llm_model
+                "implementation": self.config.llm_implementation,
+                "model_name": self.config.llm_model
             }
             
             # Additional parameters from kwargs
             llm_params.update(self.kwargs.get("llm_params", {}))
             
             try:
-                self._llm = LLMQueryAPI(
-                    implementation=self.config.llm_implementation,
-                    **llm_params
-                )
+                self._llm = LLMQueryAPI(**llm_params)
                 
                 init_time = time.time() - init_start
                 logger.info("LLM engine initialized successfully in %.3fs", init_time)

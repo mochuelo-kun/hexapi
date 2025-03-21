@@ -1,10 +1,38 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
+import logging
+
+logger = logging.getLogger('chrysalis.llm_query.base')
 
 class LLMQueryBase(ABC):
+    """Base class for LLM query implementations"""
+    
+    def __init__(self, implementation: str, model_name: str, **kwargs):
+        """
+        Initialize LLM query implementation
+        
+        Args:
+            implementation: Name of the implementation (e.g., "ollama", "openai")
+            model_name: Name of the model to use (e.g., "llama2", "gpt-4")
+            **kwargs: Additional implementation-specific parameters
+        """
+        self.implementation = implementation
+        self.model_name = model_name
+        self.kwargs = kwargs
+        logger.info("Initialized %s LLM query with model: %s", implementation, model_name)
+    
     @abstractmethod
-    def query_llm(self, prompt: str, **kwargs) -> str:
-        """Query a single LLM model."""
+    def query(self, prompt: str, system_prompt: str = None) -> str:
+        """
+        Query the LLM with the given prompt
+        
+        Args:
+            prompt: The user's prompt
+            system_prompt: Optional system prompt to set context
+            
+        Returns:
+            The model's response
+        """
         pass
 
 class MultiLLMQuery:
@@ -20,5 +48,5 @@ class MultiLLMQuery:
         # TODO: Make this actually parallel using asyncio
         for model_id in model_ids:
             if model_id in self.models:
-                results[model_id] = self.models[model_id].query_llm(prompt, **kwargs)
+                results[model_id] = self.models[model_id].query(prompt, **kwargs)
         return results 

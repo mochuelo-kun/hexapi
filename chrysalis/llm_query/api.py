@@ -1,71 +1,91 @@
-from typing import Optional, Dict, List
-from .base import LLMQueryBase, MultiLLMQuery
+import logging
+from typing import Dict, List, Optional, Type
+from .base import LLMQueryBase
 from .ollama import OllamaQuery
 # Import other implementations here
 
+logger = logging.getLogger('chrysalis.llm_query.api')
+
+# Map of implementation names to their classes
+IMPLEMENTATIONS: Dict[str, Type[LLMQueryBase]] = {
+    "ollama": OllamaQuery,
+    # Add other implementations here
+}
+
 class LLMQueryAPI:
-    def __init__(self):
-        self.implementation_map = {
-            "ollama": OllamaQuery,
-            # Add other implementations here
-        }
-        
-        self.instances: Dict[str, LLMQueryBase] = {}
+    """Factory for creating LLM query implementations"""
     
-    def get_implementation(self, model_name: str) -> LLMQueryBase:
-        """Get or create an implementation instance based on model name prefix"""
-        if model_name in self.instances:
-            return self.instances[model_name]
-            
-        # Parse model name to determine implementation
-        # Example: "ollama:llama2" -> use OllamaQuery with model "llama2"
-        impl_name, *model_parts = model_name.split(":")
-        actual_model = model_parts[0] if model_parts else model_name
-        
-        if impl_name not in self.implementation_map:
-            raise ValueError(f"Unknown implementation: {impl_name}")
-            
-        instance = self.implementation_map[impl_name](model_name=actual_model)
-        self.instances[model_name] = instance
-        return instance
-    
-    def query(self, prompt: str, model: str = "ollama:llama2", **kwargs) -> str:
+    def __init__(self, implementation: str, model_name: str, **kwargs):
         """
-        Query a single LLM model
+        Initialize LLM query API
         
         Args:
-            prompt: Input text prompt
-            model: Model identifier (e.g. "ollama:llama2", "openai:gpt-4")
-            **kwargs: Additional model-specific parameters
+            implementation: Name of the implementation to use
+            model_name: Name of the model to use
+            **kwargs: Additional parameters for the implementation
+        """
+        if implementation not in IMPLEMENTATIONS:
+            raise ValueError(f"Unknown LLM implementation: {implementation}")
             
-        Returns:
-            Model response
-        """
-        implementation = self.get_implementation(model)
-        return implementation.query_llm(prompt, **kwargs)
+        self.implementation = implementation
+        self.model_name = model_name
+        self.kwargs = kwargs
+        
+        logger.info("Creating LLM query API with implementation: %s, model: %s", 
+                   implementation, model_name)
+        
+        try:
+            self._impl = IMPLEMENTATIONS[implementation](
+                model_name=model_name,
+                **kwargs
+            )
+        except Exception as e:
+            logger.error("Failed to initialize LLM implementation %s: %s", 
+                        implementation, e, exc_info=True)
+            raise
     
-    def query_multiple(self, 
-                      prompt: str,
-                      models: Optional[List[str]] = None,
-                      **kwargs) -> Dict[str, str]:
+    def query(self, prompt: str, system_prompt: str = None) -> str:
         """
-        Query multiple LLM models in parallel
+        Query the LLM with the given prompt
         
         Args:
-            prompt: Input text prompt
-            models: List of model identifiers
-            **kwargs: Additional model-specific parameters
+            prompt: The user's prompt
+            system_prompt: Optional system prompt to set context
             
         Returns:
-            Dict mapping model names to responses
+            The model's response
         """
-        if models is None:
-            models = ["ollama:llama2"]  # Default model
-            
-        implementations = {
-            model: self.get_implementation(model)
-            for model in models
-        }
+        logger.debug("Querying LLM with prompt: %s", 
+                    prompt[:100] + "..." if len(prompt) > 100 else prompt)
         
-        multi_query = MultiLLMQuery(implementations)
-        return multi_query.query_llms(prompt, **kwargs) 
+        try:
+            return self._impl.query(prompt, system_prompt)
+        except Exception as e:
+            logger.error("Error during LLM query: %s", e, exc_info=True)
+            raise
+    
+    # def query_multiple(self, 
+    #                   prompt: str,
+    #                   models: Optional[List[str]] = None,
+    #                   **kwargs) -> Dict[str, str]:
+    #     """
+    #     Query multiple LLM models in parallel
+        
+    #     Args:
+    #         prompt: Input text prompt
+    #         models: List of model identifiers
+    #         **kwargs: Additional model-specific parameters
+            
+    #     Returns:
+    #         Dict mapping model names to responses
+    #     """
+    #     if models is None:
+    #         models = ["ollama:llama2"]  # Default model
+            
+    #     implementations = {
+    #         model: self.get_implementation(model)
+    #         for model in models
+    #     }
+        
+    #     multi_query = MultiLLMQuery(implementations)
+    #     return multi_query.query_llms(prompt, **kwargs) 

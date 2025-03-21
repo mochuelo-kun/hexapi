@@ -23,6 +23,7 @@ transformers = "^4.49.0"
 sherpa-onnx = "^1.11.0"
 psutil = "^7.0.0"
 onnx = "^1.17.0"
+ollama = "^0.4.7"
 
 [tool.poetry.scripts]
 chrysalis = "chrysalis.cli:cli"

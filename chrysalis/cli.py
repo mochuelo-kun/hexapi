@@ -109,20 +109,21 @@ def transcribe(
 
 @cli.command()
 @click.argument('text')
-@click.option('--model', '-m', help='LLM model to use (e.g. "ollama:llama2")')
+@click.option('--implementation', '-i', 
+              type=click.Choice(['ollama', 'openai']), 
+              default='ollama',
+              help='LLM implementation to use')
+@click.option('--model', '-m', 
+              help='LLM model to use (e.g. "llama2", "qwen2.5:1.5b", "gpt-4")')
 @click.option('--system-prompt', '-s', help='System prompt for LLM')
 @click.option('--format', '-f', type=click.Choice(['text', 'json']), default='text',
               help='Output format (text or json)')
-def query(text: str, model: str, system_prompt: str, format: str):
+def query(text: str, implementation: str, model: str, system_prompt: str, format: str):
     """Query LLM with text input"""
-    config = PipelineConfig()
-    if model:
-        # Determine implementation from model name
-        if "openai" in model.lower():
-            config.llm_implementation = "openai"
-        else:
-            config.llm_implementation = "ollama"
-        config.llm_model = model
+    config = PipelineConfig(
+        llm_implementation=implementation,
+        llm_model=model
+    )
     
     pipeline = Pipeline(config=config)
     
@@ -131,6 +132,8 @@ def query(text: str, model: str, system_prompt: str, format: str):
     if format == 'json':
         click.echo(json.dumps({
             "input": text,
+            "implementation": implementation,
+            "model": model,
             "response": response
         }, indent=2))
     else:
